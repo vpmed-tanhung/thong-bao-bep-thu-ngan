@@ -1,0 +1,36 @@
+{
+  "id": "./bep.html",
+  "name": "Bếp - Báo món cho thu ngân",
+  "short_name": "Bếp báo món",
+  "description": "Cập nhật món và số lượng tại bếp, đồng bộ realtime sang quầy thu ngân.",
+  "lang": "vi",
+  "dir": "ltr",
+  "start_url": "./bep.html?bep_app=installed",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#f1f5f9",
+  "theme_color": "#0f172a",
+  "categories": ["food", "business"],
+  "icons": [
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
