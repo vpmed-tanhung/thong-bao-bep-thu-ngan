@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <title>Bếp · Báo món</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          boxShadow: { soft: "0 18px 45px rgba(15, 23, 42, 0.12)" }
+        }
+      }
+    };
+  </script>
+  <style>
+    html { -webkit-tap-highlight-color: transparent; }
+    body { min-height: 100dvh; }
+    button { touch-action: manipulation; }
+    .toast-enter { animation: toast-in .22s ease-out; }
+    @keyframes toast-in {
+      from { opacity: 0; transform: translate(-50%, 12px); }
+      to { opacity: 1; transform: translate(-50%, 0); }
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-900 antialiased">
+  <main class="mx-auto min-h-[100dvh] max-w-5xl px-4 pb-10 pt-5 sm:px-6">
+    <header class="mb-5 rounded-3xl bg-slate-900 p-5 text-white shadow-soft sm:p-7">
+      <div class="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p class="text-sm font-bold uppercase tracking-[0.22em] text-amber-300">Khu vực bếp</p>
+          <h1 class="mt-1 text-3xl font-black sm:text-4xl">Báo món cho thu ngân</h1>
+          <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
+            Chạm một lần để báo hết món. Chạm lại khi món đã có.
+          </p>
+        </div>
+        <div id="connectionBadge" class="flex items-center gap-2 rounded-full bg-slate-800 px-4 py-2 text-sm font-bold">
+          <span id="connectionDot" class="h-2.5 w-2.5 rounded-full bg-amber-400"></span>
+          <span id="connectionText">Đang kết nối…</span>
+        </div>
+      </div>
+    </header>
+
+    <section aria-labelledby="menuTitle">
+      <div class="mb-4 flex items-end justify-between gap-4">
+        <div>
+          <h2 id="menuTitle" class="text-xl font-black sm:text-2xl">Danh sách món</h2>
+          <p class="mt-1 text-sm text-slate-600">Trạng thái được đồng bộ ngay trên các thiết bị.</p>
+        </div>
+        <span id="outCount" class="shrink-0 rounded-full bg-red-100 px-3 py-1.5 text-sm font-extrabold text-red-700">0 món đang hết</span>
+      </div>
+
+      <div id="itemGrid" class="space-y-6"></div>
+    </section>
+
+    <section class="mt-7 rounded-3xl border-2 border-slate-300 bg-white p-5 shadow-sm" aria-labelledby="operationTitle">
+      <div class="mb-4">
+        <p class="text-sm font-bold uppercase tracking-wider text-slate-500">Thông báo vận hành</p>
+        <h2 id="operationTitle" class="mt-1 text-2xl font-black">Đóng khu vực</h2>
+      </div>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <button id="closeRiceCounterButton" type="button" class="min-h-20 rounded-2xl bg-amber-500 px-5 py-4 text-xl font-black text-slate-950 shadow-lg shadow-amber-500/20 transition hover:bg-amber-400 active:scale-[0.98] disabled:cursor-wait disabled:opacity-60">
+          ĐÓNG QUẦY CƠM
+        </button>
+        <button id="closeKitchenButton" type="button" class="min-h-20 rounded-2xl bg-slate-900 px-5 py-4 text-xl font-black text-white shadow-lg shadow-slate-900/20 transition hover:bg-slate-800 active:scale-[0.98] disabled:cursor-wait disabled:opacity-60">
+          ĐÓNG BẾP
+        </button>
+      </div>
+    </section>
+
+    <section class="mt-6 rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
+      <p class="font-bold text-slate-800">Cách dùng nhanh</p>
+      <p class="mt-1 leading-6">Nút đỏ = báo hết. Khi đã báo hết, nút chuyển sang màu xanh để báo món đã có lại.</p>
+    </section>
+  </main>
+
+  <div id="toast" class="pointer-events-none fixed bottom-5 left-1/2 z-50 hidden w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-2xl px-5 py-4 text-center font-bold text-white shadow-2xl" role="status" aria-live="polite"></div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
+    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
+    import {
+      getDatabase,
+      onValue,
+      push,
+      ref,
+      serverTimestamp,
+      update
+    } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-database.js";
+
+    // ============================================================
+    // CẤU HÌNH: Dán đúng Firebase Web App config của bạn vào đây.
+    // Hai file bep.html và quay.html phải dùng cùng một cấu hình.
+    // ============================================================
+    const firebaseConfig = {
+      apiKey: "AIzaSyC4Qn8Gql5iJuXNYn0pdobamxtDQyJzly0",
+      authDomain: "thong-bao-bep.firebaseapp.com",
+      databaseURL: "https://thong-bao-bep-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "thong-bao-bep",
+      storageBucket: "thong-bao-bep.firebasestorage.app",
+      messagingSenderId: "151352401372",
+      appId: "1:151352401372:web:f88f82a0783c391b31c319"
+    };
+
+    // Đổi mã này nếu có nhiều cửa hàng. Hai file phải dùng cùng STORE_ID.
+    const STORE_ID = "cua-hang-01";
+
+    const MENU_GROUPS = [
+      {
+        title: "Bún · Bánh đa · Phở",
+        items: [
+          { id: "bun-bo", name: "bún bò", icon: "🍜" },
+          { id: "bun-ga", name: "bún gà", icon: "🍜" },
+          { id: "bun-lon", name: "bún lợn", icon: "🍜" },
+          { id: "banh-da-bo", name: "bánh đa bò", icon: "🥣" },
+          { id: "banh-da-ga", name: "bánh đa gà", icon: "🥣" },
+          { id: "banh-da-lon", name: "bánh đa lợn", icon: "🥣" },
+          { id: "pho-bo", name: "phở bò", icon: "♨️" },
+          { id: "pho-ga", name: "phở gà", icon: "♨️" },
+          { id: "pho-lon", name: "phở lợn", icon: "♨️" }
+        ]
+      },
+      {
+        title: "Cháo",
+        items: [
+          { id: "chao-bo", name: "cháo bò", icon: "🥣" },
+          { id: "chao-tim", name: "cháo tim", icon: "🥣" },
+          { id: "chao-lon", name: "cháo lợn", icon: "🥣" }
+        ]
+      },
+      {
+        title: "Món riêng",
+        items: [
+          { id: "banh-cuon", name: "bánh cuốn", icon: "🥟" },
+          { id: "banh-bao", name: "bánh bao", icon: "◉" }
+        ]
+      }
+    ];
+    const ITEM_LIST = MENU_GROUPS.flatMap((group) => group.items);
+
+    const itemGrid = document.querySelector("#itemGrid");
+    const outCount = document.querySelector("#outCount");
+    const connectionBadge = document.querySelector("#connectionBadge");
+    const connectionDot = document.querySelector("#connectionDot");
+    const connectionText = document.querySelector("#connectionText");
+    const closeRiceCounterButton = document.querySelector("#closeRiceCounterButton");
+    const closeKitchenButton = document.querySelector("#closeKitchenButton");
+    const toast = document.querySelector("#toast");
+
+    let database;
+    let storeRef;
+    let itemState = {};
+    let toastTimer;
+    const pendingItems = new Set();
+
+    function hasValidConfig() {
+      return !Object.values(firebaseConfig).some((value) =>
+        typeof value !== "string" || value.includes("DAN_") || value.includes("TEN_")
+      );
+    }
+
+    function setConnection(mode, text) {
+      const styles = {
+        online: ["bg-emerald-500", "bg-emerald-900"],
+        offline: ["bg-red-400", "bg-red-900"],
+        waiting: ["bg-amber-400", "bg-slate-800"]
+      };
+      const [dotClass, badgeClass] = styles[mode] || styles.waiting;
+      connectionDot.className = `h-2.5 w-2.5 rounded-full ${dotClass}`;
+      connectionBadge.className = `flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold ${badgeClass}`;
+      connectionText.textContent = text;
+    }
+
+    function showToast(message, isError = false) {
+      window.clearTimeout(toastTimer);
+      toast.textContent = message;
+      toast.className = `toast-enter pointer-events-none fixed bottom-5 left-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-2xl px-5 py-4 text-center font-bold text-white shadow-2xl ${isError ? "bg-red-600" : "bg-slate-900"}`;
+      toastTimer = window.setTimeout(() => toast.classList.add("hidden"), 2600);
+    }
+
+    function renderItems() {
+      itemGrid.replaceChildren();
+      const totalOut = ITEM_LIST.filter((item) => itemState[item.id]?.outOfStock === true).length;
+      outCount.textContent = `${totalOut} món đang hết`;
+
+      MENU_GROUPS.forEach((group) => {
+        const section = document.createElement("section");
+        const heading = document.createElement("h3");
+        heading.className = "mb-3 text-lg font-black text-slate-700 sm:text-xl";
+        heading.textContent = group.title;
+        const grid = document.createElement("div");
+        grid.className = "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3";
+
+        group.items.forEach((item) => {
+          const isOut = itemState[item.id]?.outOfStock === true;
+          const isPending = pendingItems.has(item.id);
+          const card = document.createElement("article");
+          card.className = `rounded-3xl border-2 p-4 shadow-sm transition ${isOut ? "border-red-400 bg-red-50" : "border-white bg-white"}`;
+
+          const top = document.createElement("div");
+          top.className = "mb-4 flex items-center justify-between gap-3";
+
+          const identity = document.createElement("div");
+          identity.className = "flex min-w-0 items-center gap-3";
+
+          const icon = document.createElement("span");
+          icon.className = "grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-slate-100 text-2xl";
+          icon.textContent = item.icon;
+
+          const name = document.createElement("h4");
+          name.className = "truncate text-xl font-black capitalize sm:text-2xl";
+          name.textContent = item.name;
+          identity.append(icon, name);
+
+          const status = document.createElement("span");
+          status.className = `shrink-0 rounded-full px-3 py-1 text-xs font-black ${isOut ? "bg-red-600 text-white" : "bg-emerald-100 text-emerald-700"}`;
+          status.textContent = isOut ? "ĐANG HẾT" : "ĐANG CÓ";
+          top.append(identity, status);
+
+          const button = document.createElement("button");
+          button.type = "button";
+          button.disabled = isPending;
+          button.className = `min-h-20 w-full rounded-2xl px-4 py-4 text-xl font-black text-white shadow-lg transition active:scale-[0.98] disabled:cursor-wait disabled:opacity-60 ${isOut ? "bg-emerald-600 shadow-emerald-600/20 hover:bg-emerald-700" : "bg-red-600 shadow-red-600/20 hover:bg-red-700"}`;
+          button.textContent = isPending ? "ĐANG GỬI…" : isOut ? "✓ BÁO ĐÃ CÓ LẠI" : "! BÁO HẾT";
+          button.addEventListener("click", () => changeItemStatus(item, !isOut));
+
+          card.append(top, button);
+          grid.append(card);
+        });
+
+        section.append(heading, grid);
+        itemGrid.append(section);
+      });
+    }
+
+    async function changeItemStatus(item, nextOutOfStock) {
+      if (!storeRef || pendingItems.has(item.id)) return;
+      pendingItems.add(item.id);
+      renderItems();
+
+      const eventRef = push(ref(database, `stores/${STORE_ID}/events`));
+      const type = nextOutOfStock ? "OUT_OF_STOCK" : "BACK_IN_STOCK";
+      const message = nextOutOfStock
+        ? `Hết ${item.name}.`
+        : `Có lại ${item.name}.`;
+      const userId = getAuth().currentUser?.uid || "unknown";
+
+      const updates = {};
+      updates[`items/${item.id}`] = {
+        name: item.name,
+        outOfStock: nextOutOfStock,
+        updatedAt: serverTimestamp(),
+        updatedBy: userId
+      };
+      updates[`events/${eventRef.key}`] = {
+        type,
+        itemId: item.id,
+        name: item.name,
+        message,
+        createdAt: serverTimestamp(),
+        createdBy: userId
+      };
+
+      try {
+        await update(storeRef, updates);
+        showToast(nextOutOfStock ? `Đã báo hết ${item.name}` : `Đã báo ${item.name} có lại`);
+      } catch (error) {
+        console.error(error);
+        showToast("Không gửi được thông báo. Kiểm tra mạng hoặc Firebase.", true);
+      } finally {
+        pendingItems.delete(item.id);
+        renderItems();
+      }
+    }
+
+    async function sendOperationalEvent(button, type, message, successMessage) {
+      if (!storeRef || button.disabled) return;
+      button.disabled = true;
+      const originalText = button.textContent;
+      button.textContent = "ĐANG GỬI…";
+      const eventRef = push(ref(database, `stores/${STORE_ID}/events`));
+      const userId = getAuth().currentUser?.uid || "unknown";
+
+      try {
+        await update(storeRef, {
+          [`events/${eventRef.key}`]: {
+            type,
+            itemId: type.toLowerCase(),
+            name: successMessage,
+            message,
+            createdAt: serverTimestamp(),
+            createdBy: userId
+          }
+        });
+        showToast(successMessage);
+      } catch (error) {
+        console.error(error);
+        showToast("Không gửi được thông báo. Kiểm tra mạng hoặc Firebase.", true);
+      } finally {
+        button.disabled = false;
+        button.textContent = originalText;
+      }
+    }
+
+    async function start() {
+      renderItems();
+
+      if (!hasValidConfig()) {
+        setConnection("offline", "Chưa cấu hình Firebase");
+        showToast("Hãy dán Firebase config vào file bep.html.", true);
+        return;
+      }
+
+      try {
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        database = getDatabase(app);
+        await signInAnonymously(auth);
+        storeRef = ref(database, `stores/${STORE_ID}`);
+
+        onValue(ref(database, ".info/connected"), (snapshot) => {
+          setConnection(snapshot.val() === true ? "online" : "offline", snapshot.val() === true ? "Đã kết nối" : "Mất kết nối");
+        });
+
+        onValue(
+          ref(database, `stores/${STORE_ID}/items`),
+          (snapshot) => {
+            itemState = snapshot.val() || {};
+            renderItems();
+          },
+          (error) => {
+            console.error(error);
+            showToast("Không đọc được trạng thái món. Kiểm tra Database Rules.", true);
+          }
+        );
+      } catch (error) {
+        console.error(error);
+        setConnection("offline", "Lỗi Firebase");
+        showToast("Kết nối Firebase thất bại. Kiểm tra config và Anonymous Auth.", true);
+      }
+    }
+
+    closeRiceCounterButton.addEventListener("click", () => {
+      sendOperationalEvent(
+        closeRiceCounterButton,
+        "CLOSE_RICE_COUNTER",
+        "Đóng quầy cơm.",
+        "Đã báo đóng quầy cơm"
+      );
+    });
+    closeKitchenButton.addEventListener("click", () => {
+      sendOperationalEvent(
+        closeKitchenButton,
+        "CLOSE_KITCHEN",
+        "Đóng bếp.",
+        "Đã báo đóng bếp"
+      );
+    });
+    start();
+  </script>
+</body>
+</html>
