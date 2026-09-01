@@ -33,9 +33,6 @@
         <div>
           <p class="text-sm font-bold uppercase tracking-[0.22em] text-amber-300">Khu vực bếp</p>
           <h1 class="mt-1 text-3xl font-black sm:text-4xl">Báo món cho thu ngân</h1>
-          <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
-            Bánh cuốn và bánh bao theo số lượng. Sợi, topping và cháo báo hết/có lại bằng một nút.
-          </p>
         </div>
         <div id="connectionBadge" class="flex items-center gap-2 rounded-full bg-slate-800 px-4 py-2 text-sm font-bold">
           <span id="connectionDot" class="h-2.5 w-2.5 rounded-full bg-amber-400"></span>
@@ -51,6 +48,9 @@
           <p class="mt-1 text-sm text-slate-600">Trạng thái được đồng bộ ngay trên các thiết bị.</p>
         </div>
         <div class="flex shrink-0 flex-wrap justify-end gap-2">
+          <button id="resetAllButton" type="button" class="rounded-full bg-sky-600 px-4 py-1.5 text-sm font-extrabold text-white shadow-sm transition hover:bg-sky-700 active:scale-95 disabled:cursor-wait disabled:opacity-60">
+            ↻ RESET TOÀN BỘ MÓN
+          </button>
           <span id="lowCount" class="rounded-full bg-amber-100 px-3 py-1.5 text-sm font-extrabold text-amber-800">0 loại bánh sắp hết</span>
           <span id="outCount" class="rounded-full bg-red-100 px-3 py-1.5 text-sm font-extrabold text-red-700">0 món đang hết</span>
         </div>
@@ -111,6 +111,7 @@
     // Đổi mã này nếu có nhiều cửa hàng. Hai file phải dùng cùng STORE_ID.
     const STORE_ID = "cua-hang-01";
     const LOW_STOCK_LIMIT = 4;
+    const KITCHEN_STATUS_ID = "__kitchen-closed";
 
     const MENU_GROUPS = [
       {
@@ -161,6 +162,7 @@
     const connectionBadge = document.querySelector("#connectionBadge");
     const connectionDot = document.querySelector("#connectionDot");
     const connectionText = document.querySelector("#connectionText");
+    const resetAllButton = document.querySelector("#resetAllButton");
     const closeRiceCounterButton = document.querySelector("#closeRiceCounterButton");
     const closeKitchenButton = document.querySelector("#closeKitchenButton");
     const toast = document.querySelector("#toast");
@@ -168,6 +170,8 @@
     let database;
     let storeRef;
     let itemState = {};
+    let kitchenClosed = false;
+    let operationPending = false;
     let toastTimer;
     const pendingItems = new Set();
 
@@ -203,8 +207,55 @@
         : null;
     }
 
+    function getVietnamDayKey(timestamp = Date.now()) {
+      const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: "Asia/Ho_Chi_Minh",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+      }).formatToParts(new Date(timestamp));
+      const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+      return `${values.year}-${values.month}-${values.day}`;
+    }
+
+    function autoOpenKitchenForNewDay() {
+      const kitchenStatus = itemState[KITCHEN_STATUS_ID];
+      if (!storeRef || operationPending || kitchenStatus?.outOfStock !== true) return;
+      if (typeof kitchenStatus.updatedAt !== "number") return;
+      if (getVietnamDayKey(kitchenStatus.updatedAt) !== getVietnamDayKey()) {
+        resetAllItems(true);
+      }
+    }
+
+    function renderOperationState() {
+      resetAllButton.disabled = operationPending;
+      resetAllButton.textContent = operationPending
+        ? "ĐANG CẬP NHẬT…"
+        : kitchenClosed
+          ? "↻ MỞ BẾP & RESET TOÀN BỘ"
+          : "↻ RESET TOÀN BỘ MÓN";
+      resetAllButton.className = `rounded-full px-4 py-1.5 text-sm font-extrabold text-white shadow-sm transition active:scale-95 disabled:cursor-wait disabled:opacity-60 ${
+        kitchenClosed ? "bg-emerald-600 hover:bg-emerald-700" : "bg-sky-600 hover:bg-sky-700"
+      }`;
+
+      closeRiceCounterButton.disabled = kitchenClosed || operationPending;
+      closeKitchenButton.disabled = kitchenClosed || operationPending;
+      closeRiceCounterButton.className = `min-h-20 rounded-2xl px-5 py-4 text-xl font-black shadow-lg transition active:scale-[0.98] disabled:cursor-not-allowed ${
+        kitchenClosed
+          ? "bg-slate-700 text-slate-400 shadow-none"
+          : "bg-amber-500 text-slate-950 shadow-amber-500/20 hover:bg-amber-400 disabled:opacity-60"
+      }`;
+      closeKitchenButton.className = `min-h-20 rounded-2xl px-5 py-4 text-xl font-black shadow-lg transition active:scale-[0.98] disabled:cursor-not-allowed ${
+        kitchenClosed
+          ? "bg-slate-700 text-slate-400 shadow-none"
+          : "bg-slate-900 text-white shadow-slate-900/20 hover:bg-slate-800 disabled:opacity-60"
+      }`;
+      closeKitchenButton.textContent = kitchenClosed ? "BẾP ĐÃ ĐÓNG" : "ĐÓNG BẾP";
+    }
+
     function renderItems() {
       itemGrid.replaceChildren();
+      renderOperationState();
       const totalOut = ITEM_LIST.filter((item) =>
         QUANTITY_ITEM_IDS.has(item.id)
           ? getQuantity(item.id) === 0
@@ -234,7 +285,9 @@
           const isLow = quantity !== null && quantity > 0 && quantity <= LOW_STOCK_LIMIT;
           const card = document.createElement("article");
           card.className = `rounded-3xl border-2 p-4 shadow-sm transition ${
-            isOut
+            kitchenClosed
+              ? "border-slate-700 bg-slate-800"
+              : isOut
               ? "border-red-400 bg-red-50"
               : isLow
                 ? "border-amber-400 bg-amber-50"
@@ -248,17 +301,19 @@
           identity.className = "flex min-w-0 items-center gap-3";
 
           const icon = document.createElement("span");
-          icon.className = "grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-slate-100 text-2xl";
+          icon.className = `grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-2xl ${kitchenClosed ? "bg-slate-700 grayscale" : "bg-slate-100"}`;
           icon.textContent = item.icon;
 
           const name = document.createElement("h4");
-          name.className = "truncate text-xl font-black capitalize sm:text-2xl";
+          name.className = `truncate text-xl font-black capitalize sm:text-2xl ${kitchenClosed ? "text-slate-400" : "text-slate-900"}`;
           name.textContent = item.name;
           identity.append(icon, name);
 
           const status = document.createElement("span");
           status.className = `shrink-0 rounded-full px-3 py-1 text-xs font-black ${
-            isOut
+            kitchenClosed
+              ? "bg-slate-700 text-slate-400"
+              : isOut
               ? "bg-red-600 text-white"
               : isLow
                 ? "bg-amber-500 text-slate-950"
@@ -266,7 +321,9 @@
                   ? "bg-slate-200 text-slate-700"
                   : "bg-emerald-100 text-emerald-700"
           }`;
-          status.textContent = group.kind === "quantity"
+          status.textContent = kitchenClosed
+            ? "ĐÃ KHÓA"
+            : group.kind === "quantity"
             ? quantity === null
               ? "CHƯA NHẬP"
               : isOut
@@ -279,7 +336,7 @@
 
           if (group.kind === "quantity") {
             const quantityLabel = document.createElement("p");
-            quantityLabel.className = "mb-2 text-center text-sm font-bold uppercase tracking-wider text-slate-500";
+            quantityLabel.className = `mb-2 text-center text-sm font-bold uppercase tracking-wider ${kitchenClosed ? "text-slate-500" : "text-slate-500"}`;
             quantityLabel.textContent = "Số suất còn lại";
 
             const controls = document.createElement("div");
@@ -287,8 +344,8 @@
 
             const minusButton = document.createElement("button");
             minusButton.type = "button";
-            minusButton.disabled = isPending || quantity === null || quantity <= 0;
-            minusButton.className = "min-h-14 rounded-xl bg-slate-800 text-3xl font-black text-white transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-35";
+            minusButton.disabled = kitchenClosed || isPending || quantity === null || quantity <= 0;
+            minusButton.className = `min-h-14 rounded-xl text-3xl font-black transition active:scale-95 disabled:cursor-not-allowed ${kitchenClosed ? "bg-slate-700 text-slate-500" : "bg-slate-800 text-white disabled:opacity-35"}`;
             minusButton.textContent = "−";
             minusButton.setAttribute("aria-label", `Giảm một suất ${item.name}`);
             minusButton.addEventListener("click", () => changeItemQuantity(item, Math.max(0, quantity - 1)));
@@ -298,10 +355,10 @@
             input.min = "0";
             input.max = "9999";
             input.inputMode = "numeric";
-            input.disabled = isPending;
+            input.disabled = kitchenClosed || isPending;
             input.value = quantity ?? "";
             input.placeholder = "0";
-            input.className = "min-h-14 min-w-0 rounded-xl border-2 border-slate-300 bg-white px-2 text-center text-3xl font-black outline-none focus:border-sky-500 disabled:opacity-60";
+            input.className = `min-h-14 min-w-0 rounded-xl border-2 px-2 text-center text-3xl font-black outline-none ${kitchenClosed ? "border-slate-700 bg-slate-900 text-slate-500" : "border-slate-300 bg-white focus:border-sky-500 disabled:opacity-60"}`;
             input.setAttribute("aria-label", `Số suất ${item.name}`);
             input.addEventListener("change", () => {
               if (input.value.trim() === "") return renderItems();
@@ -313,8 +370,8 @@
 
             const plusButton = document.createElement("button");
             plusButton.type = "button";
-            plusButton.disabled = isPending;
-            plusButton.className = "min-h-14 rounded-xl bg-emerald-600 text-3xl font-black text-white transition active:scale-95 disabled:cursor-wait disabled:opacity-50";
+            plusButton.disabled = kitchenClosed || isPending;
+            plusButton.className = `min-h-14 rounded-xl text-3xl font-black transition active:scale-95 disabled:cursor-not-allowed ${kitchenClosed ? "bg-slate-700 text-slate-500" : "bg-emerald-600 text-white disabled:opacity-50"}`;
             plusButton.textContent = "+";
             plusButton.setAttribute("aria-label", `Tăng một suất ${item.name}`);
             plusButton.addEventListener("click", () => changeItemQuantity(item, (quantity ?? 0) + 1));
@@ -324,9 +381,15 @@
           } else {
             const button = document.createElement("button");
             button.type = "button";
-            button.disabled = isPending;
-            button.className = `min-h-20 w-full rounded-2xl px-4 py-4 text-xl font-black text-white shadow-lg transition active:scale-[0.98] disabled:cursor-wait disabled:opacity-60 ${isOut ? "bg-emerald-600 shadow-emerald-600/20 hover:bg-emerald-700" : "bg-red-600 shadow-red-600/20 hover:bg-red-700"}`;
-            button.textContent = isPending ? "ĐANG GỬI…" : isOut ? "✓ BÁO ĐÃ CÓ LẠI" : "! BÁO HẾT";
+            button.disabled = kitchenClosed || isPending;
+            button.className = `min-h-20 w-full rounded-2xl px-4 py-4 text-xl font-black shadow-lg transition active:scale-[0.98] disabled:cursor-not-allowed ${
+              kitchenClosed
+                ? "bg-slate-700 text-slate-500 shadow-none"
+                : isOut
+                  ? "bg-emerald-600 text-white shadow-emerald-600/20 hover:bg-emerald-700 disabled:opacity-60"
+                  : "bg-red-600 text-white shadow-red-600/20 hover:bg-red-700 disabled:opacity-60"
+            }`;
+            button.textContent = kitchenClosed ? "ĐÃ KHÓA" : isPending ? "ĐANG GỬI…" : isOut ? "✓ BÁO ĐÃ CÓ LẠI" : "! BÁO HẾT";
             button.addEventListener("click", () => changeItemStatus(item, !isOut));
             card.append(top, button);
           }
@@ -345,7 +408,7 @@
       if (
         nextQuantity > 0 &&
         nextQuantity <= LOW_STOCK_LIMIT &&
-        (previousQuantity === null || previousQuantity === 0 || previousQuantity > LOW_STOCK_LIMIT)
+        (previousQuantity === null || previousQuantity === 0 || previousQuantity > nextQuantity)
       ) {
         return {
           type: "OUT_OF_STOCK",
@@ -360,7 +423,7 @@
     }
 
     async function changeItemQuantity(item, requestedQuantity) {
-      if (!storeRef || pendingItems.has(item.id)) return;
+      if (!storeRef || kitchenClosed || pendingItems.has(item.id)) return;
       const parsedQuantity = Math.floor(Number(requestedQuantity));
       if (!Number.isFinite(parsedQuantity)) {
         showToast("Số lượng không hợp lệ.", true);
@@ -398,6 +461,9 @@
           createdBy: userId
         };
         if (quantityEvent.level) updates[`events/${eventRef.key}`].level = quantityEvent.level;
+        if (quantityEvent.speechMessage) {
+          updates[`events/${eventRef.key}`].speechMessage = quantityEvent.speechMessage;
+        }
       }
 
       try {
@@ -413,7 +479,7 @@
     }
 
     async function changeItemStatus(item, nextOutOfStock) {
-      if (!storeRef || pendingItems.has(item.id)) return;
+      if (!storeRef || kitchenClosed || pendingItems.has(item.id)) return;
       pendingItems.add(item.id);
       renderItems();
 
@@ -481,6 +547,86 @@
       }
     }
 
+    async function closeKitchen() {
+      if (!storeRef || kitchenClosed || operationPending) return;
+
+      operationPending = true;
+      renderItems();
+      const eventRef = push(ref(database, `stores/${STORE_ID}/events`));
+      const userId = getAuth().currentUser?.uid || "unknown";
+
+      try {
+        await update(storeRef, {
+          [`items/${KITCHEN_STATUS_ID}`]: {
+            name: "trạng thái bếp",
+            outOfStock: true,
+            updatedAt: serverTimestamp(),
+            updatedBy: userId
+          },
+          [`events/${eventRef.key}`]: {
+            type: "CLOSE_KITCHEN",
+            itemId: "close_kitchen",
+            name: "Đóng bếp",
+            message: "Đóng bếp.",
+            createdAt: serverTimestamp(),
+            createdBy: userId
+          }
+        });
+      } catch (error) {
+        console.error(error);
+        showToast("Không đóng được bếp. Kiểm tra mạng hoặc Firebase.", true);
+      } finally {
+        operationPending = false;
+        renderItems();
+      }
+    }
+
+    async function resetAllItems(isAutomatic = false) {
+      if (!storeRef || operationPending) return;
+
+      operationPending = true;
+      renderItems();
+      const userId = getAuth().currentUser?.uid || "unknown";
+      const updates = {};
+      const eventRef = push(ref(database, `stores/${STORE_ID}/events`));
+
+      MENU_GROUPS.forEach((group) => {
+        group.items.forEach((item) => {
+          updates[`items/${item.id}`] = {
+            name: item.name,
+            outOfStock: false,
+            updatedAt: serverTimestamp(),
+            updatedBy: userId
+          };
+        });
+      });
+      updates[`items/${KITCHEN_STATUS_ID}`] = {
+        name: "trạng thái bếp",
+        outOfStock: false,
+        updatedAt: serverTimestamp(),
+        updatedBy: userId
+      };
+      updates[`events/${eventRef.key}`] = {
+        type: "BACK_IN_STOCK",
+        level: "RESET_MENU",
+        itemId: "reset_menu",
+        name: "Reset toàn bộ món",
+        message: "Reset toàn bộ món.",
+        createdAt: serverTimestamp(),
+        createdBy: userId
+      };
+
+      try {
+        await update(storeRef, updates);
+      } catch (error) {
+        console.error(error);
+        showToast("Không reset được món. Kiểm tra mạng hoặc Firebase.", true);
+      } finally {
+        operationPending = false;
+        renderItems();
+      }
+    }
+
     async function start() {
       renderItems();
 
@@ -505,7 +651,9 @@
           ref(database, `stores/${STORE_ID}/items`),
           (snapshot) => {
             itemState = snapshot.val() || {};
+            kitchenClosed = itemState[KITCHEN_STATUS_ID]?.outOfStock === true;
             renderItems();
+            autoOpenKitchenForNewDay();
           },
           (error) => {
             console.error(error);
@@ -528,13 +676,10 @@
       );
     });
     closeKitchenButton.addEventListener("click", () => {
-      sendOperationalEvent(
-        closeKitchenButton,
-        "CLOSE_KITCHEN",
-        "Đóng bếp.",
-        "Đã báo đóng bếp"
-      );
+      closeKitchen();
     });
+    resetAllButton.addEventListener("click", () => resetAllItems(false));
+    window.setInterval(autoOpenKitchenForNewDay, 60_000);
     start();
   </script>
 </body>

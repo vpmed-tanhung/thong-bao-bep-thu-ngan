@@ -18,15 +18,6 @@
   <style>
     body { min-height: 100dvh; }
     button { touch-action: manipulation; }
-    .alert-pop { animation: alert-pop .35s ease-out; }
-    @keyframes alert-pop {
-      0% { opacity: .25; transform: scale(.97); }
-      70% { transform: scale(1.015); }
-      100% { opacity: 1; transform: scale(1); }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      .alert-pop { animation: none; }
-    }
   </style>
 </head>
 <body class="bg-slate-100 text-slate-900 antialiased">
@@ -47,29 +38,15 @@
         </div>
       </div>
 
-      <div id="audioPanel" class="mt-6 rounded-2xl border border-amber-300/40 bg-amber-300/10 p-4">
-        <div class="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p class="font-black text-amber-200">Cần kích hoạt âm thanh một lần</p>
-            <p class="mt-1 text-sm text-slate-300">Tăng âm lượng máy/loa, rồi bấm nút bên cạnh. Trình duyệt sẽ đọc một câu thử.</p>
-          </div>
-          <button id="enableAudioButton" type="button" class="min-h-14 shrink-0 rounded-xl bg-amber-400 px-6 py-3 text-lg font-black text-slate-950 shadow-lg shadow-amber-400/20 transition hover:bg-amber-300 active:scale-[0.98]">
-            🔊 BẬT ÂM THANH
+      <div id="audioPanel" class="mt-4 rounded-xl border border-amber-300/40 bg-amber-300/10 px-4 py-3">
+        <div class="flex items-center justify-between gap-3">
+          <p class="text-sm font-black text-amber-200 sm:text-base">🔈 Âm thanh chưa bật</p>
+          <button id="enableAudioButton" type="button" class="min-h-11 shrink-0 rounded-lg bg-amber-400 px-4 py-2 text-sm font-black text-slate-950 shadow-md shadow-amber-400/20 transition hover:bg-amber-300 active:scale-[0.98] sm:text-base">
+            BẬT LOA
           </button>
         </div>
       </div>
     </header>
-
-    <section id="latestAlert" class="mt-5 rounded-3xl border-2 border-slate-200 bg-white p-6 shadow-soft" aria-live="assertive" aria-atomic="true">
-      <div class="flex items-start gap-4">
-        <div id="latestIcon" class="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-slate-100 text-3xl">🔔</div>
-        <div class="min-w-0">
-          <p id="latestLabel" class="text-sm font-black uppercase tracking-wider text-slate-500">Thông báo mới nhất</p>
-          <p id="latestMessage" class="mt-1 text-2xl font-black leading-tight text-slate-800 sm:text-4xl">Đang chờ thông báo từ bếp…</p>
-          <p id="latestTime" class="mt-3 text-sm font-semibold text-slate-500"></p>
-        </div>
-      </div>
-    </section>
 
     <section class="mt-5 rounded-3xl bg-white p-5 shadow-sm sm:p-6" aria-labelledby="stockTitle">
       <div class="flex flex-wrap items-center justify-between gap-3">
@@ -175,18 +152,12 @@
     const clock = document.querySelector("#clock");
     const audioPanel = document.querySelector("#audioPanel");
     const enableAudioButton = document.querySelector("#enableAudioButton");
-    const latestAlert = document.querySelector("#latestAlert");
-    const latestIcon = document.querySelector("#latestIcon");
-    const latestLabel = document.querySelector("#latestLabel");
-    const latestMessage = document.querySelector("#latestMessage");
-    const latestTime = document.querySelector("#latestTime");
     const stockGrid = document.querySelector("#stockGrid");
     const lowStockCount = document.querySelector("#lowStockCount");
     const outCount = document.querySelector("#outCount");
     const outList = document.querySelector("#outList");
     const allAvailable = document.querySelector("#allAvailable");
     const historyList = document.querySelector("#historyList");
-    const emptyHistory = document.querySelector("#emptyHistory");
     const speechQueueBadge = document.querySelector("#speechQueueBadge");
 
     const pageOpenedAt = Date.now();
@@ -255,30 +226,13 @@
       return URL.createObjectURL(new Blob([buffer], { type: "audio/wav" }));
     }
 
-    async function getTtsAudioSource(text) {
-      let response;
-      try {
-        response = await fetch(TTS_API_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text })
-        });
-      } catch (error) {
-        console.warn("POST TTS bị chặn, chuyển sang phát trực tiếp.", error);
-        return {
-          url: `${TTS_API_URL}?text=${encodeURIComponent(text)}`,
-          revokeAfterPlay: false
-        };
-      }
-
-      if (!response.ok) {
-        const detail = await response.json().catch(() => ({}));
-        throw new Error(detail.error || `TTS API lỗi HTTP ${response.status}`);
-      }
-
+    function getTtsAudioSource(text) {
+      const audioUrl = new URL(TTS_API_URL);
+      audioUrl.searchParams.set("text", text);
+      audioUrl.searchParams.set("v", "5");
       return {
-        url: URL.createObjectURL(await response.blob()),
-        revokeAfterPlay: true
+        url: audioUrl.href,
+        revokeAfterPlay: false
       };
     }
 
@@ -308,7 +262,7 @@
     }
 
     async function playTts(text) {
-      const audioSource = await getTtsAudioSource(text);
+      const audioSource = getTtsAudioSource(text);
       try {
         await playAudioUrl(audioSource.url);
       } finally {
@@ -349,7 +303,7 @@
 
     async function enableAudio() {
       enableAudioButton.disabled = true;
-      enableAudioButton.textContent = "ĐANG KẾT NỐI…";
+      enableAudioButton.textContent = "ĐANG BẬT…";
       const silentUrl = createSilentWavUrl();
 
       try {
@@ -357,18 +311,18 @@
         await playAudioUrl(silentUrl);
         audioEnabled = true;
         await playTts("Đã bật âm thanh");
-        enableAudioButton.textContent = "✓ ÂM THANH ĐÃ BẬT";
-        enableAudioButton.className = "min-h-14 shrink-0 rounded-xl bg-emerald-500 px-6 py-3 text-lg font-black text-white";
-        audioPanel.className = "mt-6 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-4";
-        audioPanel.querySelector("p").textContent = "Âm thanh tiếng Việt đang hoạt động";
+        enableAudioButton.textContent = "✓ ĐÃ BẬT";
+        enableAudioButton.className = "min-h-11 shrink-0 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-black text-white sm:text-base";
+        audioPanel.className = "mt-4 rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-4 py-3";
+        audioPanel.querySelector("p").textContent = "🔊 Âm thanh đang hoạt động";
         processSpeechQueue();
       } catch (error) {
         console.error(error);
         audioEnabled = false;
         enableAudioButton.disabled = false;
-        enableAudioButton.textContent = "THỬ BẬT LẠI ÂM THANH";
+        enableAudioButton.textContent = "THỬ LẠI";
         audioPanel.querySelector("p").textContent = error?.message || "Không gọi được TTS backend";
-        audioPanel.className = "mt-6 rounded-2xl border border-red-400/40 bg-red-400/10 p-4";
+        audioPanel.className = "mt-4 rounded-xl border border-red-400/40 bg-red-400/10 px-4 py-3";
       } finally {
         URL.revokeObjectURL(silentUrl);
       }
@@ -481,37 +435,8 @@
       });
     }
 
-    function showLatestEvent(event) {
-      const isPositive = event.type === "BACK_IN_STOCK";
-      const isWarning = event.type === "LOW_STOCK" || event.level === "LOW_STOCK";
-      const labels = {
-        OUT_OF_STOCK: "Bếp vừa báo hết",
-        LOW_STOCK: "Bếp báo sắp hết",
-        BACK_IN_STOCK: "Bếp vừa báo có lại",
-        CLOSE_RICE_COUNTER: "Thông báo đóng quầy cơm",
-        CLOSE_KITCHEN: "Thông báo đóng bếp"
-      };
-      const alertColors = isPositive
-        ? ["border-emerald-500 bg-emerald-50", "bg-emerald-600 text-white", "text-emerald-700", "text-emerald-900"]
-        : isWarning
-          ? ["border-amber-500 bg-amber-50", "bg-amber-500 text-slate-950", "text-amber-700", "text-amber-950"]
-          : ["border-red-500 bg-red-50", "bg-red-600 text-white", "text-red-600", "text-red-900"];
-      latestAlert.className = `mt-5 rounded-3xl border-2 p-6 shadow-soft ${alertColors[0]}`;
-      latestIcon.className = `grid h-14 w-14 shrink-0 place-items-center rounded-2xl text-3xl ${alertColors[1]}`;
-      latestIcon.textContent = isPositive ? "✓" : isWarning ? "⚠" : "!";
-      latestLabel.className = `text-sm font-black uppercase tracking-wider ${alertColors[2]}`;
-      latestLabel.textContent = isWarning ? "Bếp báo sắp hết" : labels[event.type] || "Thông báo từ bếp";
-      latestMessage.className = `mt-1 text-2xl font-black leading-tight sm:text-4xl ${alertColors[3]}`;
-      latestMessage.textContent = event.message;
-      latestTime.textContent = `Nhận lúc ${formatTime(event.createdAt || Date.now())}`;
-
-      // Khởi động lại animation khi có sự kiện liên tiếp.
-      void latestAlert.offsetWidth;
-      latestAlert.classList.add("alert-pop");
-    }
-
     function addHistory(event) {
-      emptyHistory?.remove();
+      historyList.querySelector("#emptyHistory")?.remove();
       const isPositive = event.type === "BACK_IN_STOCK";
       const isWarning = event.type === "LOW_STOCK" || event.level === "LOW_STOCK";
       const item = document.createElement("li");
@@ -538,19 +463,31 @@
       }
     }
 
+    function resetCashierView() {
+      speechQueue.length = 0;
+      updateSpeechQueueBadge();
+      const emptyItem = document.createElement("li");
+      emptyItem.id = "emptyHistory";
+      emptyItem.className = "rounded-xl bg-slate-50 p-4 text-sm text-slate-500";
+      emptyItem.textContent = "Chưa có thông báo mới.";
+      historyList.replaceChildren(emptyItem);
+    }
+
     function receiveEvent(snapshot) {
       const event = snapshot.val();
       const supportedTypes = ["OUT_OF_STOCK", "LOW_STOCK", "BACK_IN_STOCK", "CLOSE_RICE_COUNTER", "CLOSE_KITCHEN"];
       if (!event?.message || !supportedTypes.includes(event.type)) return;
-      showLatestEvent(event);
+      if (event.level === "RESET_MENU") {
+        resetCashierView();
+        return;
+      }
       addHistory(event);
-      queueSpeech(event.message);
+      queueSpeech(event.speechMessage || event.message);
     }
 
     async function start() {
       if (!hasValidConfig()) {
         setConnection("offline", "Chưa cấu hình Firebase");
-        latestMessage.textContent = "Hãy dán Firebase config vào file quay.html.";
         return;
       }
 
@@ -599,7 +536,6 @@
       } catch (error) {
         console.error(error);
         setConnection("offline", "Lỗi Firebase");
-        latestMessage.textContent = "Kết nối Firebase thất bại. Kiểm tra config và Anonymous Auth.";
       }
     }
 

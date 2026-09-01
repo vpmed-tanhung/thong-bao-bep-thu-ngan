@@ -92,7 +92,9 @@ async function handleTts(request, response, next) {
     response.set({
       "Content-Type": audio.contentType || "audio/mpeg",
       "Content-Length": String(audio.buffer.length),
-      "Cache-Control": "private, max-age=3600",
+      "Cache-Control": request.method === "GET"
+        ? "public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800"
+        : "private, max-age=3600",
       "X-TTS-Provider": getProviderName()
     });
     return response.send(audio.buffer);

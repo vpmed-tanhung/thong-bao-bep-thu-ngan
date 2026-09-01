@@ -17,7 +17,7 @@ Firebase đã được điền sẵn cho dự án `thong-bao-bep`; hai trang dù
 - Topping báo hết/có lại: thịt lợn, thịt bò, thịt gà
 - Cháo bò, cháo tim, cháo lợn
 
-Bánh cuốn và bánh bao có số lượng. Khi còn từ 1 đến 4 suất, quầy nhận cảnh báo `Sắp hết ...`; khi về 0, quầy nhận cảnh báo `Hết ...`. Sợi, topping và cháo dùng nút báo hết/có lại.
+Bánh cuốn và bánh bao có số lượng. Khi số lượng giảm xuống 4, 3, 2 hoặc 1 suất, quầy nhận cảnh báo kèm số suất còn lại; khi về 0, quầy nhận cảnh báo `Hết ...`. Sợi, topping và cháo dùng nút báo hết/có lại.
 
 ## 2. Cấu hình Firebase
 
