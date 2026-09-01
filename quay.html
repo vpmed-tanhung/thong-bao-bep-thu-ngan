@@ -130,8 +130,8 @@
     // Phải giống STORE_ID trong bep.html.
     const STORE_ID = "cua-hang-01";
 
-    // Backend giữ API Key TTS. Khi deploy backend, thay địa chỉ này bằng HTTPS URL.
-   const TTS_API_URL = "https://thong-bao-bep-thu-ngan.vercel.app/api/tts";
+    // Backend Vercel giữ API Key TTS; trình duyệt chỉ gọi HTTPS API này.
+    const TTS_API_URL = "https://thong-bao-bep-thu-ngan.vercel.app/api/tts";
 
     const connectionBadge = document.querySelector("#connectionBadge");
     const connectionDot = document.querySelector("#connectionDot");
