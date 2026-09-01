@@ -45,6 +45,24 @@ app.get("/health", (_request, response) => {
   response.json({ ok: true, provider: getProviderName() });
 });
 
+app.get("/api/firebase-config", (_request, response) => {
+  const apiKey = process.env.FIREBASE_WEB_API_KEY?.trim();
+  if (!apiKey) {
+    return response.status(503).json({ error: "Backend chưa được cấu hình Firebase." });
+  }
+
+  response.set("Cache-Control", "no-store");
+  return response.json({
+    apiKey,
+    authDomain: "thong-bao-bep.firebaseapp.com",
+    databaseURL: "https://thong-bao-bep-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "thong-bao-bep",
+    storageBucket: "thong-bao-bep.firebasestorage.app",
+    messagingSenderId: "151352401372",
+    appId: "1:151352401372:web:f88f82a0783c391b31c319"
+  });
+});
+
 const ttsRateLimit = rateLimit({
   windowMs: 60_000,
   limit: Number(process.env.RATE_LIMIT_PER_MINUTE) || 60,

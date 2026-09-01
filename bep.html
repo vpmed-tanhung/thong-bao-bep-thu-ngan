@@ -115,6 +115,7 @@
   <div id="toast" class="pointer-events-none fixed bottom-5 left-1/2 z-50 hidden w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-2xl px-5 py-4 text-center font-bold text-white shadow-2xl" role="status" aria-live="polite"></div>
 
   <script type="module">
+    import { loadFirebaseConfig } from "./firebase-config.js";
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
     import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
     import {
@@ -125,20 +126,6 @@
       serverTimestamp,
       update
     } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-database.js";
-
-    // ============================================================
-    // CẤU HÌNH: Dán đúng Firebase Web App config của bạn vào đây.
-    // Hai file bep.html và quay.html phải dùng cùng một cấu hình.
-    // ============================================================
-    const firebaseConfig = {
-      apiKey: "AIzaSyC4Qn8Gql5iJuXNYn0pdobamxtDQyJzly0",
-      authDomain: "thong-bao-bep.firebaseapp.com",
-      databaseURL: "https://thong-bao-bep-default-rtdb.asia-southeast1.firebasedatabase.app",
-      projectId: "thong-bao-bep",
-      storageBucket: "thong-bao-bep.firebasestorage.app",
-      messagingSenderId: "151352401372",
-      appId: "1:151352401372:web:f88f82a0783c391b31c319"
-    };
 
     // Đổi mã này nếu có nhiều cửa hàng. Hai file phải dùng cùng STORE_ID.
     const STORE_ID = "cua-hang-01";
@@ -206,12 +193,6 @@
     let operationPending = false;
     let toastTimer;
     const pendingItems = new Set();
-
-    function hasValidConfig() {
-      return !Object.values(firebaseConfig).some((value) =>
-        typeof value !== "string" || value.includes("DAN_") || value.includes("TEN_")
-      );
-    }
 
     function setConnection(mode, text) {
       const styles = {
@@ -663,13 +644,8 @@
     async function start() {
       renderItems();
 
-      if (!hasValidConfig()) {
-        setConnection("offline", "Chưa cấu hình Firebase");
-        showToast("Hãy dán Firebase config vào file bep.html.", true);
-        return;
-      }
-
       try {
+        const firebaseConfig = await loadFirebaseConfig();
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         database = getDatabase(app);

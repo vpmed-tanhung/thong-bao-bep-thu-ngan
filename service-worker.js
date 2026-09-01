@@ -1,6 +1,7 @@
-const CACHE_NAME = "bep-bao-mon-v3";
+const CACHE_NAME = "bep-bao-mon-v4";
 const APP_FILES = [
   "./bep.html",
+  "./firebase-config.js",
   "./pwa-install.js",
   "./manifest.json",
   "./icon-192.png",

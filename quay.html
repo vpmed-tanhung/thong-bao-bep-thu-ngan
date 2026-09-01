@@ -88,6 +88,7 @@
   </main>
 
   <script type="module">
+    import { loadFirebaseConfig } from "./firebase-config.js";
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
     import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
     import {
@@ -100,20 +101,6 @@
       ref,
       startAt
     } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-database.js";
-
-    // ============================================================
-    // CẤU HÌNH: Dán đúng Firebase Web App config của bạn vào đây.
-    // Hai file bep.html và quay.html phải dùng cùng một cấu hình.
-    // ============================================================
-    const firebaseConfig = {
-      apiKey: "AIzaSyC4Qn8Gql5iJuXNYn0pdobamxtDQyJzly0",
-      authDomain: "thong-bao-bep.firebaseapp.com",
-      databaseURL: "https://thong-bao-bep-default-rtdb.asia-southeast1.firebasedatabase.app",
-      projectId: "thong-bao-bep",
-      storageBucket: "thong-bao-bep.firebasestorage.app",
-      messagingSenderId: "151352401372",
-      appId: "1:151352401372:web:f88f82a0783c391b31c319"
-    };
 
     // Phải giống STORE_ID trong bep.html.
     const STORE_ID = "cua-hang-01";
@@ -166,12 +153,6 @@
     audioPlayer.preload = "auto";
     let audioEnabled = false;
     let isSpeaking = false;
-
-    function hasValidConfig() {
-      return !Object.values(firebaseConfig).some((value) =>
-        typeof value !== "string" || value.includes("DAN_") || value.includes("TEN_")
-      );
-    }
 
     function formatTime(timestamp = Date.now()) {
       return new Intl.DateTimeFormat("vi-VN", {
@@ -486,12 +467,8 @@
     }
 
     async function start() {
-      if (!hasValidConfig()) {
-        setConnection("offline", "Chưa cấu hình Firebase");
-        return;
-      }
-
       try {
+        const firebaseConfig = await loadFirebaseConfig();
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const database = getDatabase(app);
