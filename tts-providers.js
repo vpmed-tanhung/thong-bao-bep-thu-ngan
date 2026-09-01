@@ -14,7 +14,9 @@ function requireEnv(name) {
 }
 
 function numberFromEnv(name, fallback) {
-  const parsed = Number(process.env[name]);
+  const rawValue = process.env[name]?.trim();
+  if (!rawValue) return fallback;
+  const parsed = Number(rawValue);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
