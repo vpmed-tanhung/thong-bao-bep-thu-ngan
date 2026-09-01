@@ -1,4 +1,4 @@
-const CACHE_NAME = "bep-bao-mon-v2";
+const CACHE_NAME = "bep-bao-mon-v3";
 const APP_FILES = [
   "./bep.html",
   "./pwa-install.js",

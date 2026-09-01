@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0f172a">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Bếp báo món">
   <link rel="manifest" href="./manifest.json">
   <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
@@ -24,25 +24,44 @@
     };
   </script>
   <style>
+    *, *::before, *::after { box-sizing: border-box; }
     html { -webkit-tap-highlight-color: transparent; }
+    html, body { width: 100%; max-width: 100%; overflow-x: hidden; }
     body { min-height: 100dvh; }
     button { touch-action: manipulation; }
+    .app-shell {
+      padding-top: max(1.25rem, env(safe-area-inset-top, 0px)) !important;
+      padding-right: max(1rem, env(safe-area-inset-right, 0px)) !important;
+      padding-bottom: max(2.5rem, env(safe-area-inset-bottom, 0px)) !important;
+      padding-left: max(1rem, env(safe-area-inset-left, 0px)) !important;
+    }
     .toast-enter { animation: toast-in .22s ease-out; }
     @keyframes toast-in {
       from { opacity: 0; transform: translate(-50%, 12px); }
       to { opacity: 1; transform: translate(-50%, 0); }
     }
+    @media (min-width: 640px) {
+      .app-shell {
+        padding-right: max(1.5rem, env(safe-area-inset-right, 0px)) !important;
+        padding-left: max(1.5rem, env(safe-area-inset-left, 0px)) !important;
+      }
+    }
+    @media (max-width: 359px) {
+      .mobile-app-title { font-size: 1.75rem !important; line-height: 1.12 !important; }
+      .mobile-status-badge { padding-inline: .55rem !important; font-size: .625rem !important; }
+      .mobile-menu-control { font-size: .75rem !important; }
+    }
   </style>
 </head>
 <body class="bg-slate-100 text-slate-900 antialiased">
-  <main class="mx-auto min-h-[100dvh] max-w-5xl px-4 pb-10 pt-5 sm:px-6">
-    <header class="mb-5 rounded-3xl bg-slate-900 p-5 text-white shadow-soft sm:p-7">
-      <div class="flex flex-wrap items-start justify-between gap-4">
-        <div>
+  <main class="app-shell mx-auto min-h-[100dvh] w-full max-w-5xl px-4 pb-10 pt-5 sm:px-6">
+    <header class="mb-5 w-full rounded-3xl bg-slate-900 p-5 text-white shadow-soft sm:p-7">
+      <div class="grid gap-4 sm:flex sm:items-start sm:justify-between">
+        <div class="min-w-0">
           <p class="text-sm font-bold uppercase tracking-[0.22em] text-amber-300">Khu vực bếp</p>
-          <h1 class="mt-1 text-3xl font-black sm:text-4xl">Báo món cho thu ngân</h1>
+          <h1 class="mobile-app-title mt-1 break-words text-3xl font-black leading-tight sm:text-4xl">Báo món cho thu ngân</h1>
         </div>
-        <div class="flex flex-col items-end gap-2">
+        <div class="flex flex-wrap items-center gap-2 sm:flex-col sm:items-end">
           <div id="connectionBadge" class="flex items-center gap-2 rounded-full bg-slate-800 px-4 py-2 text-sm font-bold">
             <span id="connectionDot" class="h-2.5 w-2.5 rounded-full bg-amber-400"></span>
             <span id="connectionText">Đang kết nối…</span>
@@ -54,18 +73,18 @@
       </div>
     </header>
 
-    <section aria-labelledby="menuTitle">
-      <div class="mb-4 flex items-end justify-between gap-4">
-        <div>
+    <section class="w-full min-w-0" aria-labelledby="menuTitle">
+      <div class="mb-4 grid min-w-0 gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+        <div class="min-w-0">
           <h2 id="menuTitle" class="text-xl font-black sm:text-2xl">Danh sách món</h2>
           <p class="mt-1 text-sm text-slate-600">Trạng thái được đồng bộ ngay trên các thiết bị.</p>
         </div>
-        <div class="flex shrink-0 flex-wrap justify-end gap-2">
-          <button id="resetAllButton" type="button" class="rounded-full bg-sky-600 px-4 py-1.5 text-sm font-extrabold text-white shadow-sm transition hover:bg-sky-700 active:scale-95 disabled:cursor-wait disabled:opacity-60">
+        <div class="grid min-w-0 grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center md:justify-end">
+          <button id="resetAllButton" type="button" class="mobile-menu-control col-span-2 w-full rounded-xl bg-sky-600 px-3 py-2 text-sm font-extrabold text-white shadow-sm transition hover:bg-sky-700 active:scale-95 disabled:cursor-wait disabled:opacity-60 sm:w-auto sm:rounded-full sm:px-4 sm:py-1.5">
             ↻ RESET TOÀN BỘ MÓN
           </button>
-          <span id="lowCount" class="rounded-full bg-amber-100 px-3 py-1.5 text-sm font-extrabold text-amber-800">0 loại bánh sắp hết</span>
-          <span id="outCount" class="rounded-full bg-red-100 px-3 py-1.5 text-sm font-extrabold text-red-700">0 món đang hết</span>
+          <span id="lowCount" class="mobile-status-badge min-w-0 rounded-xl bg-amber-100 px-2 py-2 text-center text-xs font-extrabold leading-tight text-amber-800 sm:rounded-full sm:px-3 sm:py-1.5 sm:text-sm">0 loại bánh sắp hết</span>
+          <span id="outCount" class="mobile-status-badge min-w-0 rounded-xl bg-red-100 px-2 py-2 text-center text-xs font-extrabold leading-tight text-red-700 sm:rounded-full sm:px-3 sm:py-1.5 sm:text-sm">0 món đang hết</span>
         </div>
       </div>
 
@@ -247,7 +266,7 @@
         : kitchenClosed
           ? "↻ MỞ BẾP & RESET TOÀN BỘ"
           : "↻ RESET TOÀN BỘ MÓN";
-      resetAllButton.className = `rounded-full px-4 py-1.5 text-sm font-extrabold text-white shadow-sm transition active:scale-95 disabled:cursor-wait disabled:opacity-60 ${
+      resetAllButton.className = `mobile-menu-control col-span-2 w-full rounded-xl px-3 py-2 text-sm font-extrabold text-white shadow-sm transition active:scale-95 disabled:cursor-wait disabled:opacity-60 sm:w-auto sm:rounded-full sm:px-4 sm:py-1.5 ${
         kitchenClosed ? "bg-emerald-600 hover:bg-emerald-700" : "bg-sky-600 hover:bg-sky-700"
       }`;
 
@@ -283,6 +302,7 @@
 
       MENU_GROUPS.forEach((group) => {
         const section = document.createElement("section");
+        section.className = "min-w-0";
         const heading = document.createElement("h3");
         heading.className = "mb-3 text-lg font-black text-slate-700 sm:text-xl";
         heading.textContent = group.title;
@@ -297,7 +317,7 @@
             : itemState[item.id]?.outOfStock === true;
           const isLow = quantity !== null && quantity > 0 && quantity <= LOW_STOCK_LIMIT;
           const card = document.createElement("article");
-          card.className = `rounded-3xl border-2 p-4 shadow-sm transition ${
+          card.className = `min-w-0 overflow-hidden rounded-3xl border-2 p-4 shadow-sm transition ${
             kitchenClosed
               ? "border-slate-700 bg-slate-800"
               : isOut
@@ -308,22 +328,22 @@
           }`;
 
           const top = document.createElement("div");
-          top.className = "mb-4 flex items-center justify-between gap-3";
+          top.className = "mb-4 flex min-w-0 items-center justify-between gap-2 sm:gap-3";
 
           const identity = document.createElement("div");
           identity.className = "flex min-w-0 items-center gap-3";
 
           const icon = document.createElement("span");
-          icon.className = `grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-2xl ${kitchenClosed ? "bg-slate-700 grayscale" : "bg-slate-100"}`;
+          icon.className = `grid h-11 w-11 shrink-0 place-items-center rounded-2xl text-xl sm:h-12 sm:w-12 sm:text-2xl ${kitchenClosed ? "bg-slate-700 grayscale" : "bg-slate-100"}`;
           icon.textContent = item.icon;
 
           const name = document.createElement("h4");
-          name.className = `truncate text-xl font-black capitalize sm:text-2xl ${kitchenClosed ? "text-slate-400" : "text-slate-900"}`;
+          name.className = `truncate text-lg font-black capitalize sm:text-2xl ${kitchenClosed ? "text-slate-400" : "text-slate-900"}`;
           name.textContent = item.name;
           identity.append(icon, name);
 
           const status = document.createElement("span");
-          status.className = `shrink-0 rounded-full px-3 py-1 text-xs font-black ${
+          status.className = `mobile-status-badge shrink-0 rounded-full px-2 py-1 text-[10px] font-black sm:px-3 sm:text-xs ${
             kitchenClosed
               ? "bg-slate-700 text-slate-400"
               : isOut
@@ -353,7 +373,7 @@
             quantityLabel.textContent = "Số suất còn lại";
 
             const controls = document.createElement("div");
-            controls.className = "grid grid-cols-[3.5rem_1fr_3.5rem] gap-2";
+            controls.className = "grid grid-cols-[3rem_minmax(0,1fr)_3rem] gap-2 sm:grid-cols-[3.5rem_minmax(0,1fr)_3.5rem]";
 
             const minusButton = document.createElement("button");
             minusButton.type = "button";
@@ -371,7 +391,7 @@
             input.disabled = kitchenClosed || isPending;
             input.value = quantity ?? "";
             input.placeholder = "0";
-            input.className = `min-h-14 min-w-0 rounded-xl border-2 px-2 text-center text-3xl font-black outline-none ${kitchenClosed ? "border-slate-700 bg-slate-900 text-slate-500" : "border-slate-300 bg-white focus:border-sky-500 disabled:opacity-60"}`;
+            input.className = `min-h-14 min-w-0 rounded-xl border-2 px-1 text-center text-2xl font-black outline-none sm:px-2 sm:text-3xl ${kitchenClosed ? "border-slate-700 bg-slate-900 text-slate-500" : "border-slate-300 bg-white focus:border-sky-500 disabled:opacity-60"}`;
             input.setAttribute("aria-label", `Số suất ${item.name}`);
             input.addEventListener("change", () => {
               if (input.value.trim() === "") return renderItems();
