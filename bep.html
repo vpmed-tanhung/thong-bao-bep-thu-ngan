@@ -34,7 +34,7 @@
           <p class="text-sm font-bold uppercase tracking-[0.22em] text-amber-300">Khu vực bếp</p>
           <h1 class="mt-1 text-3xl font-black sm:text-4xl">Báo món cho thu ngân</h1>
           <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
-            Chạm một lần để báo hết món. Chạm lại khi món đã có.
+            Bánh cuốn và bánh bao theo số lượng. Sợi, topping và cháo báo hết/có lại bằng một nút.
           </p>
         </div>
         <div id="connectionBadge" class="flex items-center gap-2 rounded-full bg-slate-800 px-4 py-2 text-sm font-bold">
@@ -50,7 +50,10 @@
           <h2 id="menuTitle" class="text-xl font-black sm:text-2xl">Danh sách món</h2>
           <p class="mt-1 text-sm text-slate-600">Trạng thái được đồng bộ ngay trên các thiết bị.</p>
         </div>
-        <span id="outCount" class="shrink-0 rounded-full bg-red-100 px-3 py-1.5 text-sm font-extrabold text-red-700">0 món đang hết</span>
+        <div class="flex shrink-0 flex-wrap justify-end gap-2">
+          <span id="lowCount" class="rounded-full bg-amber-100 px-3 py-1.5 text-sm font-extrabold text-amber-800">0 loại bánh sắp hết</span>
+          <span id="outCount" class="rounded-full bg-red-100 px-3 py-1.5 text-sm font-extrabold text-red-700">0 món đang hết</span>
+        </div>
       </div>
 
       <div id="itemGrid" class="space-y-6"></div>
@@ -73,7 +76,7 @@
 
     <section class="mt-6 rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
       <p class="font-bold text-slate-800">Cách dùng nhanh</p>
-      <p class="mt-1 leading-6">Nút đỏ = báo hết. Khi đã báo hết, nút chuyển sang màu xanh để báo món đã có lại.</p>
+      <p class="mt-1 leading-6">Món có số lượng: dùng nút − / + hoặc nhập trực tiếp. Cháo giữ cách báo hết/có lại như trước.</p>
     </section>
   </main>
 
@@ -107,42 +110,54 @@
 
     // Đổi mã này nếu có nhiều cửa hàng. Hai file phải dùng cùng STORE_ID.
     const STORE_ID = "cua-hang-01";
+    const LOW_STOCK_LIMIT = 4;
 
     const MENU_GROUPS = [
       {
-        title: "Bún · Bánh đa · Phở",
+        title: "Món theo suất",
+        kind: "quantity",
         items: [
-          { id: "bun-bo", name: "bún bò", icon: "🍜" },
-          { id: "bun-ga", name: "bún gà", icon: "🍜" },
-          { id: "bun-lon", name: "bún lợn", icon: "🍜" },
-          { id: "banh-da-bo", name: "bánh đa bò", icon: "🥣" },
-          { id: "banh-da-ga", name: "bánh đa gà", icon: "🥣" },
-          { id: "banh-da-lon", name: "bánh đa lợn", icon: "🥣" },
-          { id: "pho-bo", name: "phở bò", icon: "♨️" },
-          { id: "pho-ga", name: "phở gà", icon: "♨️" },
-          { id: "pho-lon", name: "phở lợn", icon: "♨️" }
+          { id: "banh-cuon", name: "bánh cuốn", icon: "🥟" },
+          { id: "banh-bao", name: "bánh bao", icon: "◉" }
+        ]
+      },
+      {
+        title: "Sợi",
+        kind: "toggle",
+        items: [
+          { id: "bun", name: "bún", icon: "🍜" },
+          { id: "pho", name: "phở", icon: "♨️" },
+          { id: "banh-da", name: "bánh đa", icon: "🥣" }
+        ]
+      },
+      {
+        title: "Topping",
+        kind: "toggle",
+        items: [
+          { id: "thit-lon", name: "thịt lợn", icon: "🐷" },
+          { id: "thit-bo", name: "thịt bò", icon: "🐮" },
+          { id: "thit-ga", name: "thịt gà", icon: "🐔" }
         ]
       },
       {
         title: "Cháo",
+        kind: "toggle",
         items: [
           { id: "chao-bo", name: "cháo bò", icon: "🥣" },
           { id: "chao-tim", name: "cháo tim", icon: "🥣" },
           { id: "chao-lon", name: "cháo lợn", icon: "🥣" }
         ]
-      },
-      {
-        title: "Món riêng",
-        items: [
-          { id: "banh-cuon", name: "bánh cuốn", icon: "🥟" },
-          { id: "banh-bao", name: "bánh bao", icon: "◉" }
-        ]
       }
     ];
     const ITEM_LIST = MENU_GROUPS.flatMap((group) => group.items);
+    const QUANTITY_ITEMS = MENU_GROUPS
+      .filter((group) => group.kind === "quantity")
+      .flatMap((group) => group.items);
+    const QUANTITY_ITEM_IDS = new Set(QUANTITY_ITEMS.map((item) => item.id));
 
     const itemGrid = document.querySelector("#itemGrid");
     const outCount = document.querySelector("#outCount");
+    const lowCount = document.querySelector("#lowCount");
     const connectionBadge = document.querySelector("#connectionBadge");
     const connectionDot = document.querySelector("#connectionDot");
     const connectionText = document.querySelector("#connectionText");
@@ -181,10 +196,26 @@
       toastTimer = window.setTimeout(() => toast.classList.add("hidden"), 2600);
     }
 
+    function getQuantity(itemId) {
+      const value = itemState[itemId]?.quantity;
+      return typeof value === "number" && Number.isFinite(value)
+        ? Math.max(0, Math.floor(value))
+        : null;
+    }
+
     function renderItems() {
       itemGrid.replaceChildren();
-      const totalOut = ITEM_LIST.filter((item) => itemState[item.id]?.outOfStock === true).length;
+      const totalOut = ITEM_LIST.filter((item) =>
+        QUANTITY_ITEM_IDS.has(item.id)
+          ? getQuantity(item.id) === 0
+          : itemState[item.id]?.outOfStock === true
+      ).length;
+      const totalLow = QUANTITY_ITEMS.filter((item) => {
+        const quantity = getQuantity(item.id);
+        return quantity !== null && quantity > 0 && quantity <= LOW_STOCK_LIMIT;
+      }).length;
       outCount.textContent = `${totalOut} món đang hết`;
+      lowCount.textContent = `${totalLow} loại bánh sắp hết`;
 
       MENU_GROUPS.forEach((group) => {
         const section = document.createElement("section");
@@ -195,10 +226,20 @@
         grid.className = "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3";
 
         group.items.forEach((item) => {
-          const isOut = itemState[item.id]?.outOfStock === true;
           const isPending = pendingItems.has(item.id);
+          const quantity = group.kind === "quantity" ? getQuantity(item.id) : null;
+          const isOut = group.kind === "quantity"
+            ? quantity === 0
+            : itemState[item.id]?.outOfStock === true;
+          const isLow = quantity !== null && quantity > 0 && quantity <= LOW_STOCK_LIMIT;
           const card = document.createElement("article");
-          card.className = `rounded-3xl border-2 p-4 shadow-sm transition ${isOut ? "border-red-400 bg-red-50" : "border-white bg-white"}`;
+          card.className = `rounded-3xl border-2 p-4 shadow-sm transition ${
+            isOut
+              ? "border-red-400 bg-red-50"
+              : isLow
+                ? "border-amber-400 bg-amber-50"
+                : "border-white bg-white"
+          }`;
 
           const top = document.createElement("div");
           top.className = "mb-4 flex items-center justify-between gap-3";
@@ -216,24 +257,159 @@
           identity.append(icon, name);
 
           const status = document.createElement("span");
-          status.className = `shrink-0 rounded-full px-3 py-1 text-xs font-black ${isOut ? "bg-red-600 text-white" : "bg-emerald-100 text-emerald-700"}`;
-          status.textContent = isOut ? "ĐANG HẾT" : "ĐANG CÓ";
+          status.className = `shrink-0 rounded-full px-3 py-1 text-xs font-black ${
+            isOut
+              ? "bg-red-600 text-white"
+              : isLow
+                ? "bg-amber-500 text-slate-950"
+                : quantity === null && group.kind === "quantity"
+                  ? "bg-slate-200 text-slate-700"
+                  : "bg-emerald-100 text-emerald-700"
+          }`;
+          status.textContent = group.kind === "quantity"
+            ? quantity === null
+              ? "CHƯA NHẬP"
+              : isOut
+                ? "ĐANG HẾT"
+                : isLow
+                  ? "SẮP HẾT"
+                  : "ĐANG CÓ"
+            : isOut ? "ĐANG HẾT" : "ĐANG CÓ";
           top.append(identity, status);
 
-          const button = document.createElement("button");
-          button.type = "button";
-          button.disabled = isPending;
-          button.className = `min-h-20 w-full rounded-2xl px-4 py-4 text-xl font-black text-white shadow-lg transition active:scale-[0.98] disabled:cursor-wait disabled:opacity-60 ${isOut ? "bg-emerald-600 shadow-emerald-600/20 hover:bg-emerald-700" : "bg-red-600 shadow-red-600/20 hover:bg-red-700"}`;
-          button.textContent = isPending ? "ĐANG GỬI…" : isOut ? "✓ BÁO ĐÃ CÓ LẠI" : "! BÁO HẾT";
-          button.addEventListener("click", () => changeItemStatus(item, !isOut));
+          if (group.kind === "quantity") {
+            const quantityLabel = document.createElement("p");
+            quantityLabel.className = "mb-2 text-center text-sm font-bold uppercase tracking-wider text-slate-500";
+            quantityLabel.textContent = "Số suất còn lại";
 
-          card.append(top, button);
+            const controls = document.createElement("div");
+            controls.className = "grid grid-cols-[3.5rem_1fr_3.5rem] gap-2";
+
+            const minusButton = document.createElement("button");
+            minusButton.type = "button";
+            minusButton.disabled = isPending || quantity === null || quantity <= 0;
+            minusButton.className = "min-h-14 rounded-xl bg-slate-800 text-3xl font-black text-white transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-35";
+            minusButton.textContent = "−";
+            minusButton.setAttribute("aria-label", `Giảm một suất ${item.name}`);
+            minusButton.addEventListener("click", () => changeItemQuantity(item, Math.max(0, quantity - 1)));
+
+            const input = document.createElement("input");
+            input.type = "number";
+            input.min = "0";
+            input.max = "9999";
+            input.inputMode = "numeric";
+            input.disabled = isPending;
+            input.value = quantity ?? "";
+            input.placeholder = "0";
+            input.className = "min-h-14 min-w-0 rounded-xl border-2 border-slate-300 bg-white px-2 text-center text-3xl font-black outline-none focus:border-sky-500 disabled:opacity-60";
+            input.setAttribute("aria-label", `Số suất ${item.name}`);
+            input.addEventListener("change", () => {
+              if (input.value.trim() === "") return renderItems();
+              changeItemQuantity(item, input.value);
+            });
+            input.addEventListener("keydown", (event) => {
+              if (event.key === "Enter") input.blur();
+            });
+
+            const plusButton = document.createElement("button");
+            plusButton.type = "button";
+            plusButton.disabled = isPending;
+            plusButton.className = "min-h-14 rounded-xl bg-emerald-600 text-3xl font-black text-white transition active:scale-95 disabled:cursor-wait disabled:opacity-50";
+            plusButton.textContent = "+";
+            plusButton.setAttribute("aria-label", `Tăng một suất ${item.name}`);
+            plusButton.addEventListener("click", () => changeItemQuantity(item, (quantity ?? 0) + 1));
+
+            controls.append(minusButton, input, plusButton);
+            card.append(top, quantityLabel, controls);
+          } else {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.disabled = isPending;
+            button.className = `min-h-20 w-full rounded-2xl px-4 py-4 text-xl font-black text-white shadow-lg transition active:scale-[0.98] disabled:cursor-wait disabled:opacity-60 ${isOut ? "bg-emerald-600 shadow-emerald-600/20 hover:bg-emerald-700" : "bg-red-600 shadow-red-600/20 hover:bg-red-700"}`;
+            button.textContent = isPending ? "ĐANG GỬI…" : isOut ? "✓ BÁO ĐÃ CÓ LẠI" : "! BÁO HẾT";
+            button.addEventListener("click", () => changeItemStatus(item, !isOut));
+            card.append(top, button);
+          }
           grid.append(card);
         });
 
         section.append(heading, grid);
         itemGrid.append(section);
       });
+    }
+
+    function buildQuantityEvent(previousQuantity, nextQuantity, itemName) {
+      if (nextQuantity === 0 && previousQuantity !== 0) {
+        return { type: "OUT_OF_STOCK", level: "", message: `Hết ${itemName}.` };
+      }
+      if (
+        nextQuantity > 0 &&
+        nextQuantity <= LOW_STOCK_LIMIT &&
+        (previousQuantity === null || previousQuantity === 0 || previousQuantity > LOW_STOCK_LIMIT)
+      ) {
+        return {
+          type: "OUT_OF_STOCK",
+          level: "LOW_STOCK",
+          message: `Sắp hết ${itemName}, còn ${nextQuantity} suất.`
+        };
+      }
+      if (previousQuantity === 0 && nextQuantity > LOW_STOCK_LIMIT) {
+        return { type: "BACK_IN_STOCK", level: "", message: `Có lại ${itemName}.` };
+      }
+      return null;
+    }
+
+    async function changeItemQuantity(item, requestedQuantity) {
+      if (!storeRef || pendingItems.has(item.id)) return;
+      const parsedQuantity = Math.floor(Number(requestedQuantity));
+      if (!Number.isFinite(parsedQuantity)) {
+        showToast("Số lượng không hợp lệ.", true);
+        return;
+      }
+
+      const nextQuantity = Math.min(9999, Math.max(0, parsedQuantity));
+      const previousQuantity = getQuantity(item.id);
+      if (previousQuantity === nextQuantity) return;
+
+      pendingItems.add(item.id);
+      renderItems();
+
+      const quantityEvent = buildQuantityEvent(previousQuantity, nextQuantity, item.name);
+
+      const userId = getAuth().currentUser?.uid || "unknown";
+      const updates = {
+        [`items/${item.id}`]: {
+          name: item.name,
+          quantity: nextQuantity,
+          outOfStock: nextQuantity === 0,
+          updatedAt: serverTimestamp(),
+          updatedBy: userId
+        }
+      };
+
+      if (quantityEvent) {
+        const eventRef = push(ref(database, `stores/${STORE_ID}/events`));
+        updates[`events/${eventRef.key}`] = {
+          type: quantityEvent.type,
+          itemId: item.id,
+          name: item.name,
+          message: quantityEvent.message,
+          createdAt: serverTimestamp(),
+          createdBy: userId
+        };
+        if (quantityEvent.level) updates[`events/${eventRef.key}`].level = quantityEvent.level;
+      }
+
+      try {
+        await update(storeRef, updates);
+        showToast(`Đã cập nhật ${item.name}: ${nextQuantity} suất`);
+      } catch (error) {
+        console.error(error);
+        showToast("Không cập nhật được số lượng. Kiểm tra mạng hoặc Firebase.", true);
+      } finally {
+        pendingItems.delete(item.id);
+        renderItems();
+      }
     }
 
     async function changeItemStatus(item, nextOutOfStock) {

@@ -1,13 +1,36 @@
 <!doctype html>
 <html lang="vi">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Thông báo bếp</title>
-    <meta http-equiv="refresh" content="0; url=quay.html">
-    <script>location.replace("quay.html");</script>
-  </head>
-  <body>
-    <a href="quay.html">Mở màn hình quầy</a>
-  </body>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0f172a">
+  <title>Thông báo bếp · Chọn màn hình</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100dvh; display: grid; place-items: center; padding: 24px; background: #f1f5f9; color: #0f172a; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    main { width: min(680px, 100%); border-radius: 28px; background: #fff; padding: 32px; box-shadow: 0 18px 45px rgba(15, 23, 42, .12); }
+    p { margin: 0; color: #64748b; }
+    h1 { margin: 8px 0 10px; font-size: clamp(30px, 7vw, 48px); line-height: 1.05; }
+    .eyebrow { color: #0369a1; font-size: 13px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 28px; }
+    a { min-height: 150px; display: flex; flex-direction: column; justify-content: center; gap: 8px; border-radius: 22px; padding: 24px; color: #fff; text-decoration: none; transition: transform .15s ease; }
+    a:active { transform: scale(.98); }
+    a:first-child { background: #0f172a; }
+    a:last-child { background: #0369a1; }
+    strong { font-size: 26px; }
+    span { color: rgba(255,255,255,.8); line-height: 1.5; }
+    @media (max-width: 560px) { main { padding: 24px; } .grid { grid-template-columns: 1fr; } a { min-height: 120px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="eyebrow">Hệ thống realtime</p>
+    <h1>Chọn màn hình</h1>
+    <p>Bếp cập nhật tồn kho; quầy thu ngân theo dõi số lượng và nhận thông báo bằng loa.</p>
+    <div class="grid">
+      <a href="bep.html"><strong>🍳 Khu vực bếp</strong><span>Cập nhật số lượng và báo hết món</span></a>
+      <a href="quay.html"><strong>🔊 Quầy thu ngân</strong><span>Theo dõi số lượng và nghe thông báo</span></a>
+    </div>
+  </main>
+</body>
 </html>

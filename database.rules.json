@@ -8,14 +8,14 @@
         "items": {
           "$itemId": {
             ".write": "auth != null && newData.exists()",
-            ".validate": "newData.hasChildren(['name', 'outOfStock', 'updatedAt', 'updatedBy']) && newData.child('name').isString() && newData.child('name').val().length <= 80 && newData.child('outOfStock').isBoolean() && newData.child('updatedAt').isNumber() && newData.child('updatedBy').val() === auth.uid"
+            ".validate": "newData.hasChildren(['name', 'outOfStock', 'updatedAt', 'updatedBy']) && newData.child('name').isString() && newData.child('name').val().length <= 80 && newData.child('outOfStock').isBoolean() && (!newData.child('quantity').exists() || (newData.child('quantity').isNumber() && newData.child('quantity').val() >= 0 && newData.child('quantity').val() <= 9999)) && newData.child('updatedAt').isNumber() && newData.child('updatedBy').val() === auth.uid"
           }
         },
         "events": {
           ".indexOn": ["createdAt"],
           "$eventId": {
             ".write": "auth != null && !data.exists() && newData.exists()",
-            ".validate": "newData.hasChildren(['type', 'itemId', 'name', 'message', 'createdAt', 'createdBy']) && (newData.child('type').val() === 'OUT_OF_STOCK' || newData.child('type').val() === 'BACK_IN_STOCK' || newData.child('type').val() === 'CLOSE_RICE_COUNTER' || newData.child('type').val() === 'CLOSE_KITCHEN') && newData.child('itemId').isString() && newData.child('itemId').val().length <= 80 && newData.child('name').isString() && newData.child('name').val().length <= 80 && newData.child('message').isString() && newData.child('message').val().length <= 200 && newData.child('createdAt').isNumber() && newData.child('createdBy').val() === auth.uid"
+            ".validate": "newData.hasChildren(['type', 'itemId', 'name', 'message', 'createdAt', 'createdBy']) && (newData.child('type').val() === 'OUT_OF_STOCK' || newData.child('type').val() === 'LOW_STOCK' || newData.child('type').val() === 'BACK_IN_STOCK' || newData.child('type').val() === 'CLOSE_RICE_COUNTER' || newData.child('type').val() === 'CLOSE_KITCHEN') && newData.child('itemId').isString() && newData.child('itemId').val().length <= 80 && newData.child('name').isString() && newData.child('name').val().length <= 80 && newData.child('message').isString() && newData.child('message').val().length <= 200 && newData.child('createdAt').isNumber() && newData.child('createdBy').val() === auth.uid"
           }
         }
       }

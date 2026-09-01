@@ -21,6 +21,7 @@ const allowedOrigins = new Set(
     .filter(Boolean)
 );
 const allowFileOrigin = process.env.ALLOW_FILE_ORIGIN === "true";
+const trustedVercelOrigin = /^https:\/\/thong-bao-bep-thu-ngan(?:-[a-z0-9]+)*\.vercel\.app$/i;
 
 const cache = new Map();
 const pending = new Map();
@@ -32,7 +33,7 @@ app.use(
     origin(origin, callback) {
       if (!origin) return callback(null, true);
       if (origin === "null" && allowFileOrigin) return callback(null, true);
-      return callback(null, allowedOrigins.has(origin));
+      return callback(null, allowedOrigins.has(origin) || trustedVercelOrigin.test(origin));
     },
     methods: ["GET", "POST", "OPTIONS"],
     allowedHeaders: ["Content-Type"]
@@ -44,62 +45,64 @@ app.get("/health", (_request, response) => {
   response.json({ ok: true, provider: getProviderName() });
 });
 
-app.post(
-  "/api/tts",
-  rateLimit({
-    windowMs: 60_000,
-    limit: Number(process.env.RATE_LIMIT_PER_MINUTE) || 60,
-    standardHeaders: "draft-8",
-    legacyHeaders: false
-  }),
-  async (request, response, next) => {
-    try {
-      if (typeof request.body?.text !== "string") {
-        return response.status(400).json({ error: "Trường text phải là chuỗi." });
-      }
+const ttsRateLimit = rateLimit({
+  windowMs: 60_000,
+  limit: Number(process.env.RATE_LIMIT_PER_MINUTE) || 60,
+  standardHeaders: "draft-8",
+  legacyHeaders: false
+});
 
-      const text = request.body.text.trim().normalize("NFC");
-      if (text.length < 3 || text.length > maxTextLength) {
-        return response.status(400).json({
-          error: `Nội dung phải dài từ 3 đến ${maxTextLength} ký tự.`
-        });
-      }
-
-      const cacheKey = `${getVoiceCacheKey()}:${text}`;
-      const cached = cache.get(cacheKey);
-      let audio;
-
-      if (cached && cached.expiresAt > Date.now()) {
-        audio = cached.audio;
-      } else {
-        cache.delete(cacheKey);
-        let job = pending.get(cacheKey);
-        if (!job) {
-          job = synthesizeSpeech(text);
-          pending.set(cacheKey, job);
-        }
-
-        try {
-          audio = await job;
-          cache.set(cacheKey, { audio, expiresAt: Date.now() + cacheTtlMs });
-          if (cache.size > 200) cache.delete(cache.keys().next().value);
-        } finally {
-          pending.delete(cacheKey);
-        }
-      }
-
-      response.set({
-        "Content-Type": audio.contentType || "audio/mpeg",
-        "Content-Length": String(audio.buffer.length),
-        "Cache-Control": "private, max-age=3600",
-        "X-TTS-Provider": getProviderName()
-      });
-      return response.send(audio.buffer);
-    } catch (error) {
-      return next(error);
+async function handleTts(request, response, next) {
+  try {
+    const rawText = request.method === "GET" ? request.query?.text : request.body?.text;
+    if (typeof rawText !== "string") {
+      return response.status(400).json({ error: "Trường text phải là chuỗi." });
     }
+
+    const text = rawText.trim().normalize("NFC");
+    if (text.length < 3 || text.length > maxTextLength) {
+      return response.status(400).json({
+        error: `Nội dung phải dài từ 3 đến ${maxTextLength} ký tự.`
+      });
+    }
+
+    const cacheKey = `${getVoiceCacheKey()}:${text}`;
+    const cached = cache.get(cacheKey);
+    let audio;
+
+    if (cached && cached.expiresAt > Date.now()) {
+      audio = cached.audio;
+    } else {
+      cache.delete(cacheKey);
+      let job = pending.get(cacheKey);
+      if (!job) {
+        job = synthesizeSpeech(text);
+        pending.set(cacheKey, job);
+      }
+
+      try {
+        audio = await job;
+        cache.set(cacheKey, { audio, expiresAt: Date.now() + cacheTtlMs });
+        if (cache.size > 200) cache.delete(cache.keys().next().value);
+      } finally {
+        pending.delete(cacheKey);
+      }
+    }
+
+    response.set({
+      "Content-Type": audio.contentType || "audio/mpeg",
+      "Content-Length": String(audio.buffer.length),
+      "Cache-Control": "private, max-age=3600",
+      "X-TTS-Provider": getProviderName()
+    });
+    return response.send(audio.buffer);
+  } catch (error) {
+    return next(error);
   }
-);
+}
+
+app.get("/api/tts", ttsRateLimit, handleTts);
+app.post("/api/tts", ttsRateLimit, handleTts);
 
 app.use((error, _request, response, _next) => {
   const expected = error instanceof TtsProviderError;

@@ -71,6 +71,17 @@
       </div>
     </section>
 
+    <section class="mt-5 rounded-3xl bg-white p-5 shadow-sm sm:p-6" aria-labelledby="stockTitle">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p class="text-sm font-bold uppercase tracking-wider text-sky-700">Theo dõi để bán</p>
+          <h2 id="stockTitle" class="mt-1 text-2xl font-black sm:text-3xl">Số lượng bánh còn lại</h2>
+        </div>
+        <span id="lowStockCount" class="rounded-full bg-amber-100 px-4 py-2 font-black text-amber-800">0 loại bánh sắp hết</span>
+      </div>
+      <div id="stockGrid" class="mt-5 space-y-5"></div>
+    </section>
+
     <div class="mt-5 grid gap-5 lg:grid-cols-[1.25fr_.75fr]">
       <section class="rounded-3xl bg-white p-5 shadow-sm sm:p-6" aria-labelledby="outTitle">
         <div class="flex items-center justify-between gap-4">
@@ -129,9 +140,34 @@
 
     // Phải giống STORE_ID trong bep.html.
     const STORE_ID = "cua-hang-01";
+    const LOW_STOCK_LIMIT = 4;
+    const STOCK_GROUPS = [
+      {
+        title: "Món theo suất",
+        items: [
+          { id: "banh-cuon", name: "bánh cuốn", icon: "🥟" },
+          { id: "banh-bao", name: "bánh bao", icon: "◉" }
+        ]
+      }
+    ];
+    const STOCK_ITEMS = STOCK_GROUPS.flatMap((group) => group.items);
+    const ACTIVE_ITEM_IDS = new Set([
+      ...STOCK_ITEMS.map((item) => item.id),
+      "bun",
+      "pho",
+      "banh-da",
+      "thit-lon",
+      "thit-bo",
+      "thit-ga",
+      "chao-bo",
+      "chao-tim",
+      "chao-lon"
+    ]);
 
-    // Backend Vercel giữ API Key TTS; trình duyệt chỉ gọi HTTPS API này.
-    const TTS_API_URL = "https://thong-bao-bep-thu-ngan.vercel.app/api/tts";
+    // Nếu giao diện mở trên Vercel thì gọi cùng tên miền; GitHub Pages gọi API sản xuất.
+    const TTS_API_URL = location.hostname.endsWith(".vercel.app")
+      ? `${location.origin}/api/tts`
+      : "https://thong-bao-bep-thu-ngan.vercel.app/api/tts";
 
     const connectionBadge = document.querySelector("#connectionBadge");
     const connectionDot = document.querySelector("#connectionDot");
@@ -144,6 +180,8 @@
     const latestLabel = document.querySelector("#latestLabel");
     const latestMessage = document.querySelector("#latestMessage");
     const latestTime = document.querySelector("#latestTime");
+    const stockGrid = document.querySelector("#stockGrid");
+    const lowStockCount = document.querySelector("#lowStockCount");
     const outCount = document.querySelector("#outCount");
     const outList = document.querySelector("#outList");
     const allAvailable = document.querySelector("#allAvailable");
@@ -217,19 +255,31 @@
       return URL.createObjectURL(new Blob([buffer], { type: "audio/wav" }));
     }
 
-    async function fetchTtsAudio(text) {
-      const response = await fetch(TTS_API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text })
-      });
+    async function getTtsAudioSource(text) {
+      let response;
+      try {
+        response = await fetch(TTS_API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text })
+        });
+      } catch (error) {
+        console.warn("POST TTS bị chặn, chuyển sang phát trực tiếp.", error);
+        return {
+          url: `${TTS_API_URL}?text=${encodeURIComponent(text)}`,
+          revokeAfterPlay: false
+        };
+      }
 
       if (!response.ok) {
         const detail = await response.json().catch(() => ({}));
         throw new Error(detail.error || `TTS API lỗi HTTP ${response.status}`);
       }
 
-      return URL.createObjectURL(await response.blob());
+      return {
+        url: URL.createObjectURL(await response.blob()),
+        revokeAfterPlay: true
+      };
     }
 
     async function playAudioUrl(audioUrl) {
@@ -258,11 +308,11 @@
     }
 
     async function playTts(text) {
-      const audioUrl = await fetchTtsAudio(text);
+      const audioSource = await getTtsAudioSource(text);
       try {
-        await playAudioUrl(audioUrl);
+        await playAudioUrl(audioSource.url);
       } finally {
-        URL.revokeObjectURL(audioUrl);
+        if (audioSource.revokeAfterPlay) URL.revokeObjectURL(audioSource.url);
       }
     }
 
@@ -324,9 +374,89 @@
       }
     }
 
+    function getQuantity(items, itemId) {
+      const value = items?.[itemId]?.quantity;
+      return typeof value === "number" && Number.isFinite(value)
+        ? Math.max(0, Math.floor(value))
+        : null;
+    }
+
+    function renderInventory(items) {
+      stockGrid.replaceChildren();
+      const lowItems = STOCK_ITEMS.filter((item) => {
+        const quantity = getQuantity(items, item.id);
+        return quantity !== null && quantity > 0 && quantity <= LOW_STOCK_LIMIT;
+      });
+      lowStockCount.textContent = `${lowItems.length} loại bánh sắp hết`;
+      lowStockCount.className = `rounded-full px-4 py-2 font-black ${
+        lowItems.length > 0
+          ? "bg-amber-400 text-slate-950"
+          : "bg-emerald-100 text-emerald-800"
+      }`;
+
+      STOCK_GROUPS.forEach((group) => {
+        const section = document.createElement("section");
+        const heading = document.createElement("h3");
+        heading.className = "mb-2 text-base font-black text-slate-600";
+        heading.textContent = group.title;
+
+        const grid = document.createElement("div");
+        grid.className = "grid gap-3 sm:grid-cols-2 lg:grid-cols-4";
+
+        group.items.forEach((item) => {
+          const quantity = getQuantity(items, item.id);
+          const isOut = quantity === 0;
+          const isLow = quantity !== null && quantity > 0 && quantity <= LOW_STOCK_LIMIT;
+
+          const card = document.createElement("article");
+          card.className = `rounded-2xl border-2 p-4 ${
+            isOut
+              ? "border-red-400 bg-red-50"
+              : isLow
+                ? "border-amber-400 bg-amber-50"
+                : quantity === null
+                  ? "border-slate-200 bg-slate-50"
+                  : "border-emerald-200 bg-emerald-50"
+          }`;
+
+          const top = document.createElement("div");
+          top.className = "flex items-center justify-between gap-2";
+          const name = document.createElement("p");
+          name.className = "font-black capitalize text-slate-800";
+          name.textContent = `${item.icon} ${item.name}`;
+          const status = document.createElement("span");
+          status.className = `rounded-full px-2.5 py-1 text-[11px] font-black ${
+            isOut
+              ? "bg-red-600 text-white"
+              : isLow
+                ? "bg-amber-400 text-slate-950"
+                : quantity === null
+                  ? "bg-slate-200 text-slate-600"
+                  : "bg-emerald-600 text-white"
+          }`;
+          status.textContent = isOut ? "HẾT" : isLow ? "SẮP HẾT" : quantity === null ? "CHƯA NHẬP" : "CÒN";
+          top.append(name, status);
+
+          const amount = document.createElement("p");
+          amount.className = `mt-3 text-3xl font-black ${isOut ? "text-red-700" : isLow ? "text-amber-700" : "text-slate-900"}`;
+          amount.textContent = quantity === null ? "—" : String(quantity);
+          const unit = document.createElement("span");
+          unit.className = "ml-1 text-sm font-bold text-slate-500";
+          unit.textContent = quantity === null ? "chưa cập nhật" : "suất";
+          amount.append(unit);
+
+          card.append(top, amount);
+          grid.append(card);
+        });
+
+        section.append(heading, grid);
+        stockGrid.append(section);
+      });
+    }
+
     function renderOutOfStock(items) {
       const outItems = Object.entries(items || {})
-        .filter(([, value]) => value?.outOfStock === true)
+        .filter(([id, value]) => ACTIVE_ITEM_IDS.has(id) && value?.outOfStock === true)
         .map(([id, value]) => ({ id, ...value }))
         .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
 
@@ -353,18 +483,25 @@
 
     function showLatestEvent(event) {
       const isPositive = event.type === "BACK_IN_STOCK";
+      const isWarning = event.type === "LOW_STOCK" || event.level === "LOW_STOCK";
       const labels = {
         OUT_OF_STOCK: "Bếp vừa báo hết",
+        LOW_STOCK: "Bếp báo sắp hết",
         BACK_IN_STOCK: "Bếp vừa báo có lại",
         CLOSE_RICE_COUNTER: "Thông báo đóng quầy cơm",
         CLOSE_KITCHEN: "Thông báo đóng bếp"
       };
-      latestAlert.className = `mt-5 rounded-3xl border-2 p-6 shadow-soft ${isPositive ? "border-emerald-500 bg-emerald-50" : "border-red-500 bg-red-50"}`;
-      latestIcon.className = `grid h-14 w-14 shrink-0 place-items-center rounded-2xl text-3xl ${isPositive ? "bg-emerald-600 text-white" : "bg-red-600 text-white"}`;
-      latestIcon.textContent = isPositive ? "✓" : "!";
-      latestLabel.className = `text-sm font-black uppercase tracking-wider ${isPositive ? "text-emerald-700" : "text-red-600"}`;
-      latestLabel.textContent = labels[event.type] || "Thông báo từ bếp";
-      latestMessage.className = `mt-1 text-2xl font-black leading-tight sm:text-4xl ${isPositive ? "text-emerald-900" : "text-red-900"}`;
+      const alertColors = isPositive
+        ? ["border-emerald-500 bg-emerald-50", "bg-emerald-600 text-white", "text-emerald-700", "text-emerald-900"]
+        : isWarning
+          ? ["border-amber-500 bg-amber-50", "bg-amber-500 text-slate-950", "text-amber-700", "text-amber-950"]
+          : ["border-red-500 bg-red-50", "bg-red-600 text-white", "text-red-600", "text-red-900"];
+      latestAlert.className = `mt-5 rounded-3xl border-2 p-6 shadow-soft ${alertColors[0]}`;
+      latestIcon.className = `grid h-14 w-14 shrink-0 place-items-center rounded-2xl text-3xl ${alertColors[1]}`;
+      latestIcon.textContent = isPositive ? "✓" : isWarning ? "⚠" : "!";
+      latestLabel.className = `text-sm font-black uppercase tracking-wider ${alertColors[2]}`;
+      latestLabel.textContent = isWarning ? "Bếp báo sắp hết" : labels[event.type] || "Thông báo từ bếp";
+      latestMessage.className = `mt-1 text-2xl font-black leading-tight sm:text-4xl ${alertColors[3]}`;
       latestMessage.textContent = event.message;
       latestTime.textContent = `Nhận lúc ${formatTime(event.createdAt || Date.now())}`;
 
@@ -376,8 +513,15 @@
     function addHistory(event) {
       emptyHistory?.remove();
       const isPositive = event.type === "BACK_IN_STOCK";
+      const isWarning = event.type === "LOW_STOCK" || event.level === "LOW_STOCK";
       const item = document.createElement("li");
-      item.className = `rounded-xl border-l-4 p-3 ${isPositive ? "border-emerald-500 bg-emerald-50" : "border-red-500 bg-red-50"}`;
+      item.className = `rounded-xl border-l-4 p-3 ${
+        isPositive
+          ? "border-emerald-500 bg-emerald-50"
+          : isWarning
+            ? "border-amber-500 bg-amber-50"
+            : "border-red-500 bg-red-50"
+      }`;
 
       const message = document.createElement("p");
       message.className = "font-bold text-slate-800";
@@ -396,7 +540,7 @@
 
     function receiveEvent(snapshot) {
       const event = snapshot.val();
-      const supportedTypes = ["OUT_OF_STOCK", "BACK_IN_STOCK", "CLOSE_RICE_COUNTER", "CLOSE_KITCHEN"];
+      const supportedTypes = ["OUT_OF_STOCK", "LOW_STOCK", "BACK_IN_STOCK", "CLOSE_RICE_COUNTER", "CLOSE_KITCHEN"];
       if (!event?.message || !supportedTypes.includes(event.type)) return;
       showLatestEvent(event);
       addHistory(event);
@@ -422,7 +566,11 @@
 
         onValue(
           ref(database, `stores/${STORE_ID}/items`),
-          (snapshot) => renderOutOfStock(snapshot.val() || {}),
+          (snapshot) => {
+            const items = snapshot.val() || {};
+            renderInventory(items);
+            renderOutOfStock(items);
+          },
           (error) => {
             console.error(error);
             setConnection("offline", "Lỗi quyền Database");
@@ -458,6 +606,7 @@
     enableAudioButton.addEventListener("click", enableAudio);
     window.setInterval(() => { clock.textContent = formatTime(); }, 1000);
     clock.textContent = formatTime();
+    renderInventory({});
     renderOutOfStock({});
     start();
   </script>

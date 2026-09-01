@@ -2,23 +2,22 @@
 
 Gói gồm:
 
-- `bep.html`: bếp báo hết món, báo có lại, đóng quầy cơm hoặc đóng bếp.
-- `quay.html`: thu ngân nhận Firebase realtime và phát MP3 tiếng Việt từ TTS backend.
+- `index.html`: màn hình chọn khu vực Bếp hoặc Quầy thu ngân.
+- `bep.html`: bếp cập nhật số lượng, báo hết/có lại và đóng khu vực.
+- `quay.html`: thu ngân theo dõi tồn kho realtime và phát thông báo tiếng Việt.
 - `database.rules.json`: Rules cho Firebase Realtime Database.
-- `backend/`: API Node.js giữ kín khóa Zalo AI, FPT.AI hoặc Google Cloud TTS.
+- `server.js`, `tts-providers.js`: API Node.js giữ kín khóa TTS trên Vercel.
 
 Firebase đã được điền sẵn cho dự án `thong-bao-bep`; hai trang dùng chung `STORE_ID = "cua-hang-01"`.
 
 ## 1. Menu hiện tại
 
-- Bún bò, bún gà, bún lợn
-- Bánh đa bò, bánh đa gà, bánh đa lợn
-- Phở bò, phở gà, phở lợn
+- Món có số lượng: bánh cuốn, bánh bao
+- Sợi báo hết/có lại: bún, phở, bánh đa
+- Topping báo hết/có lại: thịt lợn, thịt bò, thịt gà
 - Cháo bò, cháo tim, cháo lợn
-- Bánh cuốn
-- Bánh bao
 
-Âm thanh chỉ đọc câu ngắn như `Hết cháo tim`, `Hết phở gà`, `Đóng quầy cơm` hoặc `Đóng bếp`.
+Bánh cuốn và bánh bao có số lượng. Khi còn từ 1 đến 4 suất, quầy nhận cảnh báo `Sắp hết ...`; khi về 0, quầy nhận cảnh báo `Hết ...`. Sợi, topping và cháo dùng nút báo hết/có lại.
 
 ## 2. Cấu hình Firebase
 
@@ -110,10 +109,10 @@ FPT.AI và Zalo AI có thể trả link trước khi MP3 sẵn sàng. Backend đ
 
 ## 4. Nối frontend với backend
 
-Trong `quay.html`, địa chỉ mặc định là:
+Trong `quay.html`, địa chỉ đang dùng là:
 
 ```js
-const TTS_API_URL = "http://localhost:3000/api/tts";
+const TTS_API_URL = "https://thong-bao-bep-thu-ngan.vercel.app/api/tts";
 ```
 
 - Nếu backend chạy trên chính máy thu ngân: giữ nguyên địa chỉ trên.
