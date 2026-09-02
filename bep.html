@@ -115,7 +115,7 @@
   <div id="toast" class="pointer-events-none fixed bottom-5 left-1/2 z-50 hidden w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-2xl px-5 py-4 text-center font-bold text-white shadow-2xl" role="status" aria-live="polite"></div>
 
   <script type="module">
-    import { loadFirebaseConfig } from "./firebase-config.js";
+    import { getPushApiUrl, loadFirebaseConfig } from "./firebase-config.js";
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
     import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
     import {
@@ -131,6 +131,7 @@
     const STORE_ID = "cua-hang-01";
     const LOW_STOCK_LIMIT = 4;
     const KITCHEN_STATUS_ID = "__kitchen-closed";
+    const PUSH_API_URL = getPushApiUrl();
 
     const MENU_GROUPS = [
       {
@@ -192,6 +193,7 @@
     let kitchenClosed = false;
     let operationPending = false;
     let toastTimer;
+    let pushSubscriptions = [];
     const pendingItems = new Set();
 
     function setConnection(mode, text) {
@@ -211,6 +213,36 @@
       toast.textContent = message;
       toast.className = `toast-enter pointer-events-none fixed bottom-5 left-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-2xl px-5 py-4 text-center font-bold text-white shadow-2xl ${isError ? "bg-red-600" : "bg-slate-900"}`;
       toastTimer = window.setTimeout(() => toast.classList.add("hidden"), 2600);
+    }
+
+    function isUsablePushSubscription(subscription) {
+      return Boolean(
+        subscription &&
+        typeof subscription.endpoint === "string" &&
+        typeof subscription.keys?.p256dh === "string" &&
+        typeof subscription.keys?.auth === "string"
+      );
+    }
+
+    async function sendBackgroundNotification(event) {
+      if (!event?.message || pushSubscriptions.length === 0) return;
+      try {
+        const response = await fetch(PUSH_API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: event.type,
+            message: event.message,
+            subscriptions: pushSubscriptions
+          }),
+          credentials: "omit",
+          keepalive: true
+        });
+        if (!response.ok) throw new Error(`Push API ${response.status}`);
+      } catch (error) {
+        // Thông báo nền là kênh bổ sung; Firebase vẫn tiếp tục cập nhật món bình thường.
+        console.warn("Không gửi được thông báo nền.", error);
+      }
     }
 
     function getQuantity(itemId) {
@@ -482,6 +514,7 @@
 
       try {
         await update(storeRef, updates);
+        if (quantityEvent) void sendBackgroundNotification(quantityEvent);
         showToast(`Đã cập nhật ${item.name}: ${nextQuantity} suất`);
       } catch (error) {
         console.error(error);
@@ -522,6 +555,7 @@
 
       try {
         await update(storeRef, updates);
+        void sendBackgroundNotification({ type, message });
         showToast(nextOutOfStock ? `Đã báo hết ${item.name}` : `Đã báo ${item.name} có lại`);
       } catch (error) {
         console.error(error);
@@ -551,6 +585,7 @@
             createdBy: userId
           }
         });
+        void sendBackgroundNotification({ type, message });
         showToast(successMessage);
       } catch (error) {
         console.error(error);
@@ -586,6 +621,7 @@
             createdBy: userId
           }
         });
+        void sendBackgroundNotification({ type: "CLOSE_KITCHEN", message: "Đóng bếp." });
       } catch (error) {
         console.error(error);
         showToast("Không đóng được bếp. Kiểm tra mạng hoặc Firebase.", true);
@@ -667,6 +703,27 @@
           (error) => {
             console.error(error);
             showToast("Không đọc được trạng thái món. Kiểm tra Database Rules.", true);
+          }
+        );
+
+        onValue(
+          ref(database, `stores/${STORE_ID}/pushSubscriptions`),
+          (snapshot) => {
+            pushSubscriptions = Object.values(snapshot.val() || {})
+              .filter(isUsablePushSubscription)
+              .slice(0, 50)
+              .map((subscription) => ({
+                endpoint: subscription.endpoint,
+                expirationTime: Number(subscription.expirationTime) || null,
+                keys: {
+                  p256dh: subscription.keys.p256dh,
+                  auth: subscription.keys.auth
+                }
+              }));
+          },
+          (error) => {
+            console.warn("Không đọc được thiết bị Thu ngân đăng ký.", error);
+            pushSubscriptions = [];
           }
         );
       } catch (error) {

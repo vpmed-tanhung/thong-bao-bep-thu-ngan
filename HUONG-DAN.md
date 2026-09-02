@@ -26,7 +26,7 @@ Nếu dùng Firebase hiện tại thì không cần thay cấu hình. Nếu chuy
 1. Tạo Firebase Web App và Realtime Database ở chế độ **Locked mode**.
 2. Vào **Authentication → Sign-in method**, bật **Anonymous**.
 3. Vào **Realtime Database → Rules**, dán `database.rules.json` rồi bấm **Publish**.
-4. Dán cùng một `firebaseConfig` vào `bep.html` và `quay.html`.
+4. Đặt khóa trình duyệt mới vào biến `FIREBASE_WEB_API_KEY` trên Vercel.
 5. Giữ cùng một `STORE_ID` trong hai file.
 
 ## 3. Cài TTS backend
@@ -162,3 +162,16 @@ Lỗi nhập liệu hoặc nhà cung cấp:
 ```
 
 Backend giới hạn độ dài, số lượt gọi, cache câu đã tạo và không trả API Key cho Client.
+
+## 7. Bật thông báo nền cho Thu ngân
+
+Thông báo nền chỉ được đăng ký tại `quay.html`. Khi trang Thu ngân đã đóng, Windows/Android/iPhone sẽ hiện thông báo hệ thống và phát âm báo; bấm thông báo sẽ mở lại trang Thu ngân. Trình duyệt không cho trang web tự bật cửa sổ khi người dùng chưa bấm.
+
+1. Mở `tao-khoa-thong-bao.html` trên máy, bấm **TẠO KHÓA MỚI**.
+2. Trên Vercel, thêm `WEB_PUSH_PUBLIC_KEY` và `WEB_PUSH_PRIVATE_KEY` bằng hai giá trị vừa tạo.
+3. Thêm `WEB_PUSH_SUBJECT=mailto:admin@example.com`, áp dụng cho Production và Preview rồi Redeploy.
+4. Trong Firebase Realtime Database → Rules, dán bản `database.rules.json` mới và bấm **Publish**.
+5. Mở trang Thu ngân, bấm **BẬT LOA + THÔNG BÁO** và chọn **Cho phép**.
+6. Đóng trang Thu ngân rồi dùng trang Bếp gửi thử một cảnh báo.
+
+Không ghi hai khóa Web Push vào tệp tải lên GitHub. Nếu dùng iPhone/iPad, hãy thêm trang Thu ngân vào Màn hình chính trước khi bật thông báo.

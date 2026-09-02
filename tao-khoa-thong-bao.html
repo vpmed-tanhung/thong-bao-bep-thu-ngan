@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tạo khóa thông báo nền</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; padding: 24px; background: #f1f5f9; color: #0f172a; font: 16px/1.5 system-ui, sans-serif; }
+    main { max-width: 760px; margin: auto; padding: 28px; border-radius: 24px; background: white; box-shadow: 0 18px 45px #0f172a1f; }
+    h1 { margin-top: 0; }
+    button { min-height: 48px; border: 0; border-radius: 12px; padding: 10px 18px; background: #0284c7; color: white; font-weight: 800; cursor: pointer; }
+    label { display: block; margin-top: 20px; font-weight: 800; }
+    textarea { width: 100%; min-height: 90px; margin-top: 8px; resize: vertical; border: 2px solid #cbd5e1; border-radius: 12px; padding: 12px; font: 14px/1.4 ui-monospace, monospace; }
+    .warning { margin: 18px 0; border-radius: 12px; background: #fff7ed; padding: 14px; color: #9a3412; font-weight: 700; }
+    .row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+    .copy { background: #0f172a; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Tạo khóa thông báo nền</h1>
+    <p>Bấm một lần, sau đó chép hai giá trị vào Environment Variables trên Vercel.</p>
+    <div class="warning">Không chụp màn hình, không gửi khóa riêng tư cho người khác và không ghi khóa vào tệp tải lên GitHub.</div>
+    <button id="generate" type="button">TẠO KHÓA MỚI</button>
+
+    <label for="publicKey">WEB_PUSH_PUBLIC_KEY</label>
+    <textarea id="publicKey" readonly></textarea>
+    <button class="copy" data-copy="publicKey" type="button">SAO CHÉP KHÓA CÔNG KHAI</button>
+
+    <label for="privateKey">WEB_PUSH_PRIVATE_KEY</label>
+    <textarea id="privateKey" readonly></textarea>
+    <button class="copy" data-copy="privateKey" type="button">SAO CHÉP KHÓA RIÊNG TƯ</button>
+    <p id="status" aria-live="polite"></p>
+  </main>
+
+  <script>
+    const decodeBase64Url = (value) => {
+      const padding = "=".repeat((4 - (value.length % 4)) % 4);
+      const binary = atob((value + padding).replace(/-/g, "+").replace(/_/g, "/"));
+      return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    };
+    const encodeBase64Url = (bytes) => {
+      let binary = "";
+      bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
+      return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+    };
+
+    document.querySelector("#generate").addEventListener("click", async () => {
+      const status = document.querySelector("#status");
+      try {
+        const keyPair = await crypto.subtle.generateKey(
+          { name: "ECDH", namedCurve: "P-256" },
+          true,
+          ["deriveBits"]
+        );
+        const publicJwk = await crypto.subtle.exportKey("jwk", keyPair.publicKey);
+        const privateJwk = await crypto.subtle.exportKey("jwk", keyPair.privateKey);
+        const x = decodeBase64Url(publicJwk.x);
+        const y = decodeBase64Url(publicJwk.y);
+        const publicKey = new Uint8Array(1 + x.length + y.length);
+        publicKey[0] = 4;
+        publicKey.set(x, 1);
+        publicKey.set(y, 1 + x.length);
+
+        document.querySelector("#publicKey").value = encodeBase64Url(publicKey);
+        document.querySelector("#privateKey").value = privateJwk.d;
+        status.textContent = "Đã tạo khóa. Hãy sao chép vào Vercel rồi đóng trang này.";
+      } catch (error) {
+        status.textContent = `Không tạo được khóa: ${error.message}`;
+      }
+    });
+
+    document.querySelectorAll("[data-copy]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const field = document.querySelector(`#${button.dataset.copy}`);
+        if (!field.value) return;
+        await navigator.clipboard.writeText(field.value);
+        button.textContent = "ĐÃ SAO CHÉP";
+      });
+    });
+  </script>
+</body>
+</html>

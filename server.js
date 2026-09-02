@@ -3,6 +3,7 @@ import cors from "cors";
 import express from "express";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
+import webpush from "web-push";
 import {
   getProviderName,
   getVoiceCacheKey,
@@ -22,6 +23,14 @@ const allowedOrigins = new Set(
 );
 const allowFileOrigin = process.env.ALLOW_FILE_ORIGIN === "true";
 const trustedVercelOrigin = /^https:\/\/thong-bao-bep-thu-ngan(?:-[a-z0-9]+)*\.vercel\.app$/i;
+const webPushPublicKey = process.env.WEB_PUSH_PUBLIC_KEY?.trim();
+const webPushPrivateKey = process.env.WEB_PUSH_PRIVATE_KEY?.trim();
+const webPushSubject = process.env.WEB_PUSH_SUBJECT?.trim() || "mailto:admin@example.com";
+const webPushConfigured = Boolean(webPushPublicKey && webPushPrivateKey);
+
+if (webPushConfigured) {
+  webpush.setVapidDetails(webPushSubject, webPushPublicKey, webPushPrivateKey);
+}
 
 const cache = new Map();
 const pending = new Map();
@@ -39,7 +48,7 @@ app.use(
     allowedHeaders: ["Content-Type"]
   })
 );
-app.use(express.json({ limit: "8kb" }));
+app.use(express.json({ limit: "32kb" }));
 
 app.get("/health", (_request, response) => {
   response.json({ ok: true, provider: getProviderName() });
@@ -61,6 +70,81 @@ app.get("/api/firebase-config", (_request, response) => {
     messagingSenderId: "151352401372",
     appId: "1:151352401372:web:f88f82a0783c391b31c319"
   });
+});
+
+app.get("/api/push-config", (_request, response) => {
+  if (!webPushPublicKey) {
+    return response.status(503).json({ error: "Backend chưa được cấu hình thông báo nền." });
+  }
+
+  response.set("Cache-Control", "no-store");
+  return response.json({ publicKey: webPushPublicKey });
+});
+
+const pushRateLimit = rateLimit({
+  windowMs: 60_000,
+  limit: Number(process.env.PUSH_RATE_LIMIT_PER_MINUTE) || 60,
+  standardHeaders: "draft-8",
+  legacyHeaders: false
+});
+
+function isValidPushSubscription(subscription) {
+  return Boolean(
+    subscription &&
+    typeof subscription.endpoint === "string" &&
+    subscription.endpoint.startsWith("https://") &&
+    subscription.endpoint.length <= 2_048 &&
+    typeof subscription.keys?.p256dh === "string" &&
+    subscription.keys.p256dh.length <= 512 &&
+    typeof subscription.keys?.auth === "string" &&
+    subscription.keys.auth.length <= 512
+  );
+}
+
+app.post("/api/push", pushRateLimit, async (request, response, next) => {
+  try {
+    if (!webPushConfigured) {
+      return response.status(503).json({ error: "Backend chưa được cấu hình thông báo nền." });
+    }
+
+    const message = typeof request.body?.message === "string"
+      ? request.body.message.trim().normalize("NFC")
+      : "";
+    const type = typeof request.body?.type === "string"
+      ? request.body.type.trim().slice(0, 40)
+      : "KITCHEN_NOTICE";
+    const subscriptions = Array.isArray(request.body?.subscriptions)
+      ? request.body.subscriptions.filter(isValidPushSubscription).slice(0, 50)
+      : [];
+
+    if (!message || message.length > 200) {
+      return response.status(400).json({ error: "Nội dung thông báo không hợp lệ." });
+    }
+    if (subscriptions.length === 0) {
+      return response.status(400).json({ error: "Chưa có thiết bị Thu ngân đăng ký." });
+    }
+
+    const payload = JSON.stringify({
+      title: "Thông báo từ bếp",
+      body: message,
+      type,
+      url: "./quay.html",
+      tag: `bep-${type}-${Date.now()}`
+    });
+    const results = await Promise.allSettled(
+      subscriptions.map((subscription) =>
+        webpush.sendNotification(subscription, payload, {
+          TTL: 120,
+          urgency: "high"
+        })
+      )
+    );
+    const sent = results.filter((result) => result.status === "fulfilled").length;
+
+    return response.json({ ok: sent > 0, sent, failed: results.length - sent });
+  } catch (error) {
+    return next(error);
+  }
 });
 
 const ttsRateLimit = rateLimit({
@@ -124,11 +208,15 @@ async function handleTts(request, response, next) {
 app.get("/api/tts", ttsRateLimit, handleTts);
 app.post("/api/tts", ttsRateLimit, handleTts);
 
-app.use((error, _request, response, _next) => {
+app.use((error, request, response, _next) => {
   const expected = error instanceof TtsProviderError;
   console.error(expected ? error.message : error);
   response.status(expected ? 502 : 500).json({
-    error: expected ? error.message : "Backend gặp lỗi khi tạo âm thanh."
+    error: expected
+      ? error.message
+      : request.path.startsWith("/api/push")
+        ? "Backend gặp lỗi khi gửi thông báo nền."
+        : "Backend gặp lỗi khi tạo âm thanh."
   });
 });
 

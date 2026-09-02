@@ -17,6 +17,12 @@
             ".write": "auth != null && !data.exists() && newData.exists()",
             ".validate": "newData.hasChildren(['type', 'itemId', 'name', 'message', 'createdAt', 'createdBy']) && (newData.child('type').val() === 'OUT_OF_STOCK' || newData.child('type').val() === 'LOW_STOCK' || newData.child('type').val() === 'BACK_IN_STOCK' || newData.child('type').val() === 'CLOSE_RICE_COUNTER' || newData.child('type').val() === 'CLOSE_KITCHEN') && newData.child('itemId').isString() && newData.child('itemId').val().length <= 80 && newData.child('name').isString() && newData.child('name').val().length <= 80 && newData.child('message').isString() && newData.child('message').val().length <= 200 && newData.child('createdAt').isNumber() && newData.child('createdBy').val() === auth.uid"
           }
+        },
+        "pushSubscriptions": {
+          "$subscriptionId": {
+            ".write": "auth != null && newData.exists() && newData.child('updatedBy').val() === auth.uid",
+            ".validate": "newData.hasChildren(['endpoint', 'expirationTime', 'keys', 'updatedAt', 'updatedBy']) && newData.child('endpoint').isString() && newData.child('endpoint').val().length <= 2048 && newData.child('expirationTime').isNumber() && newData.child('keys').hasChildren(['p256dh', 'auth']) && newData.child('keys').child('p256dh').isString() && newData.child('keys').child('p256dh').val().length <= 512 && newData.child('keys').child('auth').isString() && newData.child('keys').child('auth').val().length <= 512 && newData.child('updatedAt').isNumber() && newData.child('updatedBy').val() === auth.uid"
+          }
         }
       }
     }
