@@ -138,6 +138,7 @@
     const TTS_API_URL = location.hostname.endsWith(".vercel.app")
       ? `${location.origin}/api/tts`
       : "https://thong-bao-bep-thu-ngan.vercel.app/api/tts";
+    const IS_DESKTOP_APP = new URLSearchParams(location.search).get("desktop_app") === "1";
 
     const connectionBadge = document.querySelector("#connectionBadge");
     const connectionDot = document.querySelector("#connectionDot");
@@ -515,6 +516,7 @@
       const isPositive = event.type === "BACK_IN_STOCK";
       const isWarning = event.type === "LOW_STOCK" || event.level === "LOW_STOCK";
       const item = document.createElement("li");
+      item.dataset.kitchenMessage = event.message;
       item.className = `rounded-xl border-l-4 p-3 ${
         isPositive
           ? "border-emerald-500 bg-emerald-50"
@@ -568,7 +570,7 @@
         database = getDatabase(app);
         await signInAnonymously(auth);
         resolveFirebaseReady(true);
-        restoreBackgroundNotifications();
+        if (!IS_DESKTOP_APP) restoreBackgroundNotifications();
 
         onValue(ref(database, ".info/connected"), (snapshot) => {
           setConnection(snapshot.val() === true ? "online" : "offline", snapshot.val() === true ? "Đã kết nối" : "Mất kết nối");
@@ -618,6 +620,12 @@
     clock.textContent = formatTime();
     renderInventory({});
     renderOutOfStock({});
+    if (IS_DESKTOP_APP) {
+      audioEnabled = true;
+      enableAudioButton.classList.add("hidden");
+      audioPanel.className = "mt-4 rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-4 py-3";
+      audioPanel.querySelector("p").textContent = "🔊 Ứng dụng Windows đang tự động đọc thông báo";
+    }
     start();
   </script>
 </body>

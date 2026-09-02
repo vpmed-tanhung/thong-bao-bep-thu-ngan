@@ -1,0 +1,52 @@
+{
+  "name": "thu-ngan-thong-bao-bep",
+  "version": "1.0.0",
+  "description": "Ứng dụng Thu ngân chạy nền trong khay hệ thống Windows",
+  "private": true,
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "check": "node --check main.cjs && node --check preload.cjs && node --check popup-preload.cjs && node --check popup.js",
+    "dist": "electron-builder --win nsis portable"
+  },
+  "devDependencies": {
+    "electron": "^37.2.6",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "vn.vpmed.thungan",
+    "productName": "Thu ngan - Thong bao bep",
+    "asar": true,
+    "files": [
+      "main.cjs",
+      "preload.cjs",
+      "popup-preload.cjs",
+      "popup.html",
+      "popup.js",
+      "assets/**/*"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "icon": "assets/app-icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Thu ngân - Thông báo bếp"
+    }
+  }
+}

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'unsafe-inline'">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Thông báo từ bếp</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; padding: 16px; background: #f8fafc; color: #0f172a; font-family: "Segoe UI", system-ui, sans-serif; user-select: none; }
+    header { display: flex; align-items: center; gap: 12px; }
+    img { width: 48px; height: 48px; border-radius: 13px; }
+    p { margin: 0; }
+    .eyebrow { color: #0369a1; font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    #message { margin-top: 12px; min-height: 52px; font-size: 21px; font-weight: 800; line-height: 1.25; }
+    #time { margin-top: 5px; color: #64748b; font-size: 13px; }
+    .actions { display: grid; grid-template-columns: 1fr .72fr; gap: 10px; margin-top: 16px; }
+    button { min-height: 44px; border: 0; border-radius: 11px; padding: 9px 12px; font-weight: 800; cursor: pointer; }
+    #open { background: #0f172a; color: white; }
+    #read { background: #e2e8f0; color: #334155; }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="./assets/notification-icon.png" alt="">
+    <div>
+      <p class="eyebrow">Thu ngân</p>
+      <strong>Thông báo gần nhất</strong>
+    </div>
+  </header>
+  <p id="message">Chưa có thông báo mới.</p>
+  <p id="time"></p>
+  <div class="actions">
+    <button id="open" type="button">MỞ THU NGÂN</button>
+    <button id="read" type="button">ĐÃ XEM</button>
+  </div>
+  <script src="./popup.js"></script>
+</body>
+</html>

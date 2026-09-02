@@ -175,3 +175,9 @@ Thông báo nền chỉ được đăng ký tại `quay.html`. Khi trang Thu ng�
 6. Đóng trang Thu ngân rồi dùng trang Bếp gửi thử một cảnh báo.
 
 Không ghi hai khóa Web Push vào tệp tải lên GitHub. Nếu dùng iPhone/iPad, hãy thêm trang Thu ngân vào Màn hình chính trước khi bật thông báo.
+
+## 8. Ứng dụng Thu ngân cho Windows
+
+Mã ứng dụng nằm trong thư mục `desktop-app`. Khi đẩy bản này lên GitHub, quy trình **Tao ung dung Thu ngan Windows** trong tab Actions sẽ tự tạo hai file `.exe`: bản cài đặt và bản chạy trực tiếp.
+
+Ứng dụng Windows giữ trang Thu ngân hoạt động trong nền nên vẫn đọc TTS sau khi đóng cửa sổ. Icon ở khay hệ thống có chấm đỏ khi có cảnh báo; bấm icon mở bảng nhỏ, nhấp đúp mở trang đầy đủ, chuột phải để mở hoặc thoát ứng dụng. Xem hướng dẫn chi tiết trong `desktop-app/HUONG-DAN-CÀI-WINDOWS.md`.
