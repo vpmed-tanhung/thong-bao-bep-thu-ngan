@@ -31,7 +31,7 @@
         <div>
           <p class="text-sm font-bold uppercase tracking-[0.22em] text-sky-300">Quầy thu ngân</p>
           <h1 class="mt-1 text-3xl font-black sm:text-4xl">Thông báo realtime từ bếp</h1>
-          <p class="mt-2 text-sm leading-6 text-slate-300 sm:text-base">Đóng trang vẫn nhận cảnh báo sau khi bật thông báo nền.</p>
+          <p class="mt-2 text-sm leading-6 text-slate-300 sm:text-base">Mở trang để theo dõi và nghe thông báo từ bếp.</p>
         </div>
         <div class="flex flex-col items-end gap-2">
           <div id="connectionBadge" class="flex items-center gap-2 rounded-full bg-slate-800 px-4 py-2 text-sm font-bold">
@@ -44,9 +44,9 @@
 
       <div id="audioPanel" class="mt-4 rounded-xl border border-amber-300/40 bg-amber-300/10 px-4 py-3">
         <div class="flex items-center justify-between gap-3">
-          <p class="text-sm font-black text-amber-200 sm:text-base">🔈 Loa và thông báo nền chưa bật</p>
+          <p class="text-sm font-black text-amber-200 sm:text-base">🔈 Âm thanh chưa bật</p>
           <button id="enableAudioButton" type="button" class="min-h-11 shrink-0 rounded-lg bg-amber-400 px-4 py-2 text-sm font-black text-slate-950 shadow-md shadow-amber-400/20 transition hover:bg-amber-300 active:scale-[0.98] sm:text-base">
-            BẬT LOA + THÔNG BÁO
+            BẬT LOA
           </button>
         </div>
       </div>
@@ -92,7 +92,7 @@
   </main>
 
   <script type="module">
-    import { loadFirebaseConfig, loadWebPushPublicKey } from "./firebase-config.js";
+    import { loadFirebaseConfig } from "./firebase-config.js";
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
     import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
     import {
@@ -103,8 +103,6 @@
       orderByChild,
       query,
       ref,
-      serverTimestamp,
-      set,
       startAt
     } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-database.js";
 
@@ -162,8 +160,6 @@
     let isSpeaking = false;
     let auth;
     let database;
-    let resolveFirebaseReady;
-    const firebaseReady = new Promise((resolve) => { resolveFirebaseReady = resolve; });
 
     function formatTime(timestamp = Date.now()) {
       return new Intl.DateTimeFormat("vi-VN", {
@@ -293,83 +289,14 @@
       processSpeechQueue();
     }
 
-    function urlBase64ToUint8Array(value) {
-      const padding = "=".repeat((4 - (value.length % 4)) % 4);
-      const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
-      return Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
-    }
-
-    async function getSubscriptionId(endpoint) {
-      const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(endpoint));
-      const binary = String.fromCharCode(...new Uint8Array(digest));
-      return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-    }
-
-    async function savePushSubscription(subscription) {
-      if (!database || !auth?.currentUser) {
-        throw new Error("Thu ngân chưa kết nối Firebase.");
-      }
-
-      const value = subscription.toJSON();
-      if (!value.endpoint || !value.keys?.p256dh || !value.keys?.auth) {
-        throw new Error("Trình duyệt không tạo được thông báo nền.");
-      }
-      const subscriptionId = await getSubscriptionId(value.endpoint);
-      await set(ref(database, `stores/${STORE_ID}/pushSubscriptions/${subscriptionId}`), {
-        endpoint: value.endpoint,
-        expirationTime: Number(value.expirationTime) || 0,
-        keys: {
-          p256dh: value.keys.p256dh,
-          auth: value.keys.auth
-        },
-        updatedAt: serverTimestamp(),
-        updatedBy: auth.currentUser.uid
-      });
-    }
-
-    async function getServiceWorkerRegistration() {
-      if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
-        throw new Error("Trình duyệt này không hỗ trợ thông báo nền.");
-      }
-      if (!window.isSecureContext) {
-        throw new Error("Thông báo nền chỉ hoạt động trên HTTPS.");
-      }
-      await navigator.serviceWorker.register("./service-worker.js", { scope: "./" });
-      return navigator.serviceWorker.ready;
-    }
-
-    async function enableBackgroundNotifications() {
-      const firebaseConnected = await firebaseReady;
-      if (!firebaseConnected) throw new Error("Thu ngân chưa kết nối Firebase.");
-
-      const permission = await Notification.requestPermission();
-      if (permission !== "granted") {
-        throw new Error("Hãy chọn Cho phép thông báo cho trang Thu ngân.");
-      }
-
-      const registration = await getServiceWorkerRegistration();
-      let subscription = await registration.pushManager.getSubscription();
-      if (!subscription) {
-        const publicKey = await loadWebPushPublicKey();
-        subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(publicKey)
-        });
-      }
-      await savePushSubscription(subscription);
-    }
-
-    async function restoreBackgroundNotifications() {
-      if (!("Notification" in window)) return;
-      if (Notification.permission !== "granted") return;
+    async function disableLegacyBrowserPush() {
+      if (!("serviceWorker" in navigator)) return;
       try {
-        const registration = await getServiceWorkerRegistration();
-        const subscription = await registration.pushManager.getSubscription();
-        if (!subscription) return;
-        await savePushSubscription(subscription);
-        audioPanel.querySelector("p").textContent = "🔔 Thông báo nền đã bật • bấm để bật loa";
+        const registration = await navigator.serviceWorker.getRegistration("./");
+        const subscription = await registration?.pushManager?.getSubscription();
+        if (subscription) await subscription.unsubscribe();
       } catch (error) {
-        console.warn("Không khôi phục được thông báo nền.", error);
+        console.warn("Không gỡ được đăng ký thông báo Chrome cũ.", error);
       }
     }
 
@@ -384,19 +311,18 @@
         await playAudioUrl(silentUrl);
         audioUnlocked = true;
         audioEnabled = true;
-        await enableBackgroundNotifications();
         await playTts("Đã bật âm thanh");
         enableAudioButton.textContent = "✓ ĐÃ BẬT";
         enableAudioButton.className = "min-h-11 shrink-0 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-black text-white sm:text-base";
         audioPanel.className = "mt-4 rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-4 py-3";
-        audioPanel.querySelector("p").textContent = "🔊 Loa và thông báo nền đang hoạt động";
+        audioPanel.querySelector("p").textContent = "🔊 Âm thanh đang hoạt động";
         processSpeechQueue();
       } catch (error) {
         console.error(error);
         audioEnabled = audioUnlocked;
         enableAudioButton.disabled = false;
         enableAudioButton.textContent = "THỬ LẠI";
-        audioPanel.querySelector("p").textContent = error?.message || "Không bật được thông báo nền";
+        audioPanel.querySelector("p").textContent = error?.message || "Không gọi được TTS backend";
         audioPanel.className = "mt-4 rounded-xl border border-red-400/40 bg-red-400/10 px-4 py-3";
         if (audioUnlocked) processSpeechQueue();
       } finally {
@@ -569,8 +495,6 @@
         auth = getAuth(app);
         database = getDatabase(app);
         await signInAnonymously(auth);
-        resolveFirebaseReady(true);
-        if (!IS_DESKTOP_APP) restoreBackgroundNotifications();
 
         onValue(ref(database, ".info/connected"), (snapshot) => {
           setConnection(snapshot.val() === true ? "online" : "offline", snapshot.val() === true ? "Đã kết nối" : "Mất kết nối");
@@ -610,7 +534,6 @@
         });
       } catch (error) {
         console.error(error);
-        resolveFirebaseReady(false);
         setConnection("offline", "Lỗi Firebase");
       }
     }
@@ -620,6 +543,7 @@
     clock.textContent = formatTime();
     renderInventory({});
     renderOutOfStock({});
+    if (!IS_DESKTOP_APP) disableLegacyBrowserPush();
     if (IS_DESKTOP_APP) {
       audioEnabled = true;
       enableAudioButton.classList.add("hidden");

@@ -2,7 +2,7 @@
   "id": "./quay.html",
   "name": "Thu ngân - Nhận thông báo từ bếp",
   "short_name": "Thu ngân",
-  "description": "Nhận cảnh báo món từ bếp, kể cả khi trang đã đóng.",
+  "description": "Theo dõi số lượng món và nghe cảnh báo khi trang Thu ngân đang mở.",
   "lang": "vi",
   "start_url": "./quay.html?quay_app=installed",
   "scope": "./",

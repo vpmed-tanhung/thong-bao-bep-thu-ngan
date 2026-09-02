@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain, Menu, nativeImage, Notification, screen, shell, Tray } = require("electron");
+const fs = require("node:fs");
 const path = require("node:path");
 
 const CASHIER_URL = "https://vpmed-tanhung.github.io/thong-bao-bep-thu-ngan/quay.html?desktop_app=1";
@@ -6,6 +7,7 @@ const CASHIER_ORIGIN = "https://vpmed-tanhung.github.io";
 const normalIconPath = path.join(__dirname, "assets", "tray-normal.png");
 const alertIconPath = path.join(__dirname, "assets", "tray-alert.png");
 const notificationIconPath = path.join(__dirname, "assets", "notification-icon.png");
+const startHidden = process.argv.includes("--hidden");
 
 let mainWindow;
 let popupWindow;
@@ -48,7 +50,9 @@ function createMainWindow() {
   });
 
   mainWindow.loadURL(CASHIER_URL);
-  mainWindow.once("ready-to-show", () => mainWindow.show());
+  mainWindow.once("ready-to-show", () => {
+    if (!startHidden) mainWindow.show();
+  });
   mainWindow.webContents.on("did-fail-load", (_event, errorCode) => {
     if (errorCode === -3 || isQuitting) return;
     setTimeout(() => {
@@ -143,6 +147,31 @@ function showMainWindow() {
   mainWindow.focus();
 }
 
+function setAutoStart(enabled) {
+  if (process.platform !== "win32") return;
+  app.setLoginItemSettings({
+    openAtLogin: enabled,
+    path: process.execPath,
+    args: ["--hidden"]
+  });
+}
+
+function isAutoStartEnabled() {
+  if (process.platform !== "win32") return false;
+  return app.getLoginItemSettings({
+    path: process.execPath,
+    args: ["--hidden"]
+  }).openAtLogin;
+}
+
+function configureAutoStartOnce() {
+  if (process.platform !== "win32") return;
+  const markerPath = path.join(app.getPath("userData"), "auto-start-configured");
+  if (fs.existsSync(markerPath)) return;
+  setAutoStart(true);
+  fs.writeFileSync(markerPath, "enabled", "utf8");
+}
+
 function rebuildTrayMenu() {
   const shortenedMessage = latestNotice.message.length > 48
     ? `${latestNotice.message.slice(0, 45)}…`
@@ -150,6 +179,15 @@ function rebuildTrayMenu() {
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: "Mở Thu ngân", click: showMainWindow },
     { label: `Gần nhất: ${shortenedMessage}`, enabled: false },
+    {
+      label: "Tự khởi động cùng Windows",
+      type: "checkbox",
+      checked: isAutoStartEnabled(),
+      click(item) {
+        setAutoStart(item.checked);
+        rebuildTrayMenu();
+      }
+    },
     { type: "separator" },
     {
       label: "Thoát",
@@ -214,6 +252,7 @@ if (!hasLock) {
   app.on("second-instance", showMainWindow);
   app.whenReady().then(() => {
     app.setAppUserModelId("vn.vpmed.thungan");
+    configureAutoStartOnce();
     createMainWindow();
     createPopupWindow();
     createTray();

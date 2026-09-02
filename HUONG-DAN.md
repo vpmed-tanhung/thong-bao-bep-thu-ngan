@@ -163,21 +163,8 @@ Lỗi nhập liệu hoặc nhà cung cấp:
 
 Backend giới hạn độ dài, số lượt gọi, cache câu đã tạo và không trả API Key cho Client.
 
-## 7. Bật thông báo nền cho Thu ngân
-
-Thông báo nền chỉ được đăng ký tại `quay.html`. Khi trang Thu ngân đã đóng, Windows/Android/iPhone sẽ hiện thông báo hệ thống và phát âm báo; bấm thông báo sẽ mở lại trang Thu ngân. Trình duyệt không cho trang web tự bật cửa sổ khi người dùng chưa bấm.
-
-1. Mở `tao-khoa-thong-bao.html` trên máy, bấm **TẠO KHÓA MỚI**.
-2. Trên Vercel, thêm `WEB_PUSH_PUBLIC_KEY` và `WEB_PUSH_PRIVATE_KEY` bằng hai giá trị vừa tạo.
-3. Thêm `WEB_PUSH_SUBJECT=mailto:admin@example.com`, áp dụng cho Production và Preview rồi Redeploy.
-4. Trong Firebase Realtime Database → Rules, dán bản `database.rules.json` mới và bấm **Publish**.
-5. Mở trang Thu ngân, bấm **BẬT LOA + THÔNG BÁO** và chọn **Cho phép**.
-6. Đóng trang Thu ngân rồi dùng trang Bếp gửi thử một cảnh báo.
-
-Không ghi hai khóa Web Push vào tệp tải lên GitHub. Nếu dùng iPhone/iPad, hãy thêm trang Thu ngân vào Màn hình chính trước khi bật thông báo.
-
-## 8. Ứng dụng Thu ngân cho Windows
+## 7. Ứng dụng Thu ngân cho Windows
 
 Mã ứng dụng nằm trong thư mục `desktop-app`. Khi đẩy bản này lên GitHub, quy trình **Tao ung dung Thu ngan Windows** trong tab Actions sẽ tự tạo hai file `.exe`: bản cài đặt và bản chạy trực tiếp.
 
-Ứng dụng Windows giữ trang Thu ngân hoạt động trong nền nên vẫn đọc TTS sau khi đóng cửa sổ. Icon ở khay hệ thống có chấm đỏ khi có cảnh báo; bấm icon mở bảng nhỏ, nhấp đúp mở trang đầy đủ, chuột phải để mở hoặc thoát ứng dụng. Xem hướng dẫn chi tiết trong `desktop-app/HUONG-DAN-CÀI-WINDOWS.md`.
+Ứng dụng Windows giữ trang Thu ngân hoạt động trong nền nên vẫn đọc TTS sau khi đóng cửa sổ. Icon ở khay hệ thống có chấm đỏ khi có cảnh báo; bấm icon mở bảng nhỏ, nhấp đúp mở trang đầy đủ, chuột phải để mở hoặc thoát ứng dụng. Ứng dụng tự khởi động cùng Windows ở chế độ ẩn. Chỉ ứng dụng Windows tạo thông báo hệ thống; kênh thông báo Chrome đã được gỡ để không hiện trùng. Xem hướng dẫn chi tiết trong `desktop-app/HUONG-DAN-CÀI-WINDOWS.md`.
